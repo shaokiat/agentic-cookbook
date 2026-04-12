@@ -7,7 +7,8 @@ The foundational pattern for most modern agents. It structures the agent's behav
 
 - **Workflow**: Thought → Action (Tool Call) → Observation (Tool Result) → Thought ...
 - **Strengths**: Handles dynamic tasks well; easy to implement.
-- **Implementation in Cookbook**: See `core/agent.py` and `examples/01_react_basic.py`.
+- **Implementation in Cookbook**: See `core/agent.py` and [examples/01_react_basic.py](../examples/01_react_basic.py).
+- **Detailed Guide**: [ReAct Basic Agent Documentation](./01_react_basic.md)
 
 ## 2. Plan-and-Execute
 Separates the strategy (planning) from the execution. This avoids the "forgetfulness" of pure ReAct agents in long-horizon tasks.

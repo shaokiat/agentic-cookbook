@@ -54,6 +54,10 @@ When contributing to this project, keep the following in mind:
 > [!TIP]
 > **Minimalist first.** Before adding a dependency or a complex design pattern, ask: "Can this be done with a standard Python list or function?"
 
+### Documentation Standards
+- **Relative Paths Only**: Never use absolute local file paths (e.g., `/Users/...`) in documentation or links. Always use relative paths from the current file's location to maintain privacy, security, and portability.
+- **Link Integrity**: Ensure all relative links to source code or other documentation are tested and valid.
+
 ### Adding New Features
 -   **Tools**: Define them in `tools/` as standard functions and register them in `main.py`.
 -   **Model Features**: If adding support for vision or long-context features, update `ModelProvider` without breaking the core generation interface.

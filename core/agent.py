@@ -17,7 +17,8 @@ class Agent:
         registry: ToolRegistry,
         system_prompt: str = "You are a helpful assistant.",
         max_steps: int = 10,
-        verbose: bool = True
+        verbose: bool = True,
+        log_path: Optional[str] = None
     ):
         self.model = model
         self.memory = memory
@@ -25,11 +26,20 @@ class Agent:
         self.system_prompt = system_prompt
         self.max_steps = max_steps
         self.verbose = verbose
+        self.log_path = log_path
         self.console = Console()
 
         # Initialize memory with system prompt if empty
         if not self.memory.get_messages():
             self.memory.add_message("system", self.system_prompt)
+
+    def _log(self, data: Dict[str, Any]):
+        """
+        Append a JSON entry to the log file.
+        """
+        if self.log_path:
+            with open(self.log_path, "a") as f:
+                f.write(json.dumps(data) + "\n")
 
     def run(self, user_input: str) -> str:
         """
@@ -37,6 +47,8 @@ class Agent:
         """
         self.memory.add_message("user", user_input)
         
+        self._log({"event": "run_start", "user_input": user_input})
+
         if self.verbose:
             self.console.print(Panel(f"[bold blue]User:[/bold blue] {user_input}"))
 
@@ -50,6 +62,13 @@ class Agent:
                     messages=self.memory.get_messages(),
                     tools=self.registry.get_schemas()
                 )
+
+            self._log({
+                "step": steps,
+                "event": "think",
+                "content": response.content,
+                "tool_calls": response.tool_calls
+            })
 
             # 2. Observe (Handle Content)
             if response.content:
@@ -84,6 +103,14 @@ class Agent:
                     if self.verbose:
                         self.console.print(f"[bold magenta]Observation:[/bold magenta] {observation}")
 
+                    self._log({
+                        "step": steps,
+                        "event": "act",
+                        "tool": tool_name,
+                        "arguments": tool_args,
+                        "observation": observation
+                    })
+
                     # Add tool result to memory
                     self.memory.add_message(
                         "tool", 
@@ -102,4 +129,6 @@ class Agent:
             if self.verbose:
                 self.console.print("[bold red]Reached max steps safety limit.[/bold red]")
 
-        return self.memory.get_messages()[-1]["content"] if self.memory.get_messages() else ""
+        final_answer = self.memory.get_messages()[-1]["content"] if self.memory.get_messages() else ""
+        self._log({"event": "run_end", "final_answer": final_answer, "steps": steps})
+        return final_answer

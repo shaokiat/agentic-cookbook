@@ -43,7 +43,10 @@ def plan_and_execute(goal: str):
         registry=registry,
         system_prompt=f"""You are an executor agent. 
         Your task is to follow this plan precisely to achieve the goal:
-        {plan}"""
+        {plan}
+        
+        IMPORTANT: You are already in the project directory. Use the provided tools (list_files, read_file_content, etc.) to explore the local filesystem.""" ,
+        log_path="agent_run.log"
     )
     
     executor_agent.run("Begin executing the plan.")
