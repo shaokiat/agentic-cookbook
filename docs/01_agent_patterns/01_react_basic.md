@@ -11,7 +11,7 @@ The ReAct pattern allows an LLM to "think" about a problem, "act" by calling a t
 The system uses a dynamic tool registration system that enables the LLM to understand what tools are available and how to use them.
 
 ### Tool Registration
-Tools are defined as standard Python functions with type hints and docstrings. The [ToolRegistry](../core/registry.py) uses Python's `inspect` and `get_type_hints` modules to automatically generate OpenAI-compatible JSON schemas.
+Tools are defined as standard Python functions with type hints and docstrings. The [ToolRegistry](../../core/registry.py) uses Python's `inspect` and `get_type_hints` modules to automatically generate OpenAI-compatible JSON schemas.
 
 ```python
 def list_files(directory: str = ".") -> str:
@@ -33,7 +33,7 @@ This schema is passed to the LLM via the `ModelProvider`, allowing the model to 
 
 ### Example: Function to JSON Schema
 
-Given the following tool definition in [tools/system_tools.py](../tools/system_tools.py):
+Given the following tool definition in [tools/system_tools.py](../../tools/system_tools.py):
 
 ```python
 def list_files(directory: str = ".") -> str:
@@ -44,7 +44,7 @@ def list_files(directory: str = ".") -> str:
     # ... implementation ...
 ```
 
-The [ToolRegistry](../core/registry.py) generates this OpenAI-compatible JSON schema:
+The [ToolRegistry](../../core/registry.py) generates this OpenAI-compatible JSON schema:
 
 ```json
 {
@@ -68,7 +68,7 @@ The [ToolRegistry](../core/registry.py) generates this OpenAI-compatible JSON sc
 
 ## Agent Loop Implementation
 
-The core logic resides in the `Agent.run` method in [core/agent.py](../core/agent.py).
+The core logic resides in the `Agent.run` method in [core/agent.py](../../core/agent.py).
 
 ### Execution Flow
 
@@ -109,13 +109,13 @@ A common question is: **"How does the agent know which tool to call, and where d
 
 #### The "Tool Handshake" (Decision Phase)
 The agent doesn't "hardcode" the decision. Instead:
-1.  **Registry to Schema**: The [ToolRegistry](../core/registry.py) converts Python functions into JSON schemas.
-2.  **Feeding the Model**: In [core/agent.py](../core/agent.py#L49), these schemas are sent to the model alongside the message history.
+1.  **Registry to Schema**: The [ToolRegistry](../../core/registry.py) converts Python functions into JSON schemas.
+2.  **Feeding the Model**: In [core/agent.py](../../core/agent.py#L49), these schemas are sent to the model alongside the message history.
 3.  **Model Logic**: The LLM compares the user's intent with the tool descriptions. If it finds a match, it returns a structured **Tool Call** object (e.g., `{"name": "read_file_content", "arguments": "{\"file_path\": \"README.md\"}"}`).
 
 #### The Execution Phase (Acting)
 The actual Python function invocation does not happen inside the LLM or the `ModelProvider`. It happens within the `Agent.run` loop:
-- **Location**: [core/agent.py:L79](../core/agent.py#L79)
+- **Location**: [core/agent.py:L79](../../core/agent.py#L79)
 - **Code**: `result = self.registry.call_tool(tool_name, tool_args, context=self)`
 - **Mechanism**: The agent extracts the name and arguments from the model's response and passes them back to the `ToolRegistry`, which then executes the corresponding Python function.
 
@@ -136,7 +136,7 @@ The `ToolRegistry` distinguishes between **LLM arguments** and **System context*
 ## Implementation Details
 
 ### Available Tools in this Example
-In [examples/01_react_basic.py](../examples/01_react_basic.py), two tools are registered:
+In [examples/01_agent_patterns/01_react_basic.py](../../examples/01_agent_patterns/01_react_basic.py), two tools are registered:
 - `list_files`: Lists contents of a directory.
 - `read_file_content`: Reads the contents of a specific file.
 
@@ -178,5 +178,5 @@ while steps < self.max_steps:
 To run this example, ensure you have your environment variables set up in `.env` and run:
 
 ```bash
-python examples/01_react_basic.py
+python examples/01_agent_patterns/01_react_basic.py
 ```
