@@ -46,7 +46,7 @@ def plan_and_execute(goal: str):
         {plan}
         
         IMPORTANT: You are already in the project directory. Use the provided tools (list_files, read_file_content, etc.) to explore the local filesystem.""" ,
-        log_path="agent_run.log"
+        log_path="examples/logs/02_plan_and_execute_log.md"
     )
     
     executor_agent.run("Begin executing the plan.")

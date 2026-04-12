@@ -78,10 +78,15 @@ Following the run log [`agent_run.log`](../agent_run.log) generated during a pro
 - **Rationale**: Having confirmed `core/` exists, the agent "enters" the directory to list its source files.
 - **Action**: Calls `list_files(directory="core/")`.
 
-#### 3. Parallel Execution (Step 3) - *Optimization*
+#### 3. Parallel Execution (Step 3)
 - **Rationale**: The agent identifies 4 critical source files. Instead of 4 separate steps, it issues **4 parallel tool calls** in a single response to read them all at once.
 - **Action**: `read_file_content` for `memory.py`, `registry.py`, `model.py`, and `agent.py`.
-- **Note**: This demonstrates how modern LLMs optimize token usage by batching independent actions.
+
+> [!NOTE]
+> **Logical vs. Physical Parallelism**
+> While the model identifies these actions "in parallel" (logical batching), the current `Agent` implementation executes them **sequentially** in a Python loop. The primary optimization here is reducing the number of LLM round-trips, not concurrent execution of the tool code itself.
+
+- **Note**: This demonstrates how modern LLMs optimize token usage and latency by batching independent actions into a single turn.
 
 #### 4. Final Synthesis (Step 5)
 - **Rationale**: The agent has gathered all information from the source code and READMEs. It sees that its current internal state contains the complete answer.

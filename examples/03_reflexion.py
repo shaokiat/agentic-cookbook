@@ -2,47 +2,62 @@ import os
 from dotenv import load_dotenv
 from core.model import ModelProvider
 from core.memory import Memory
+from core.agent import Agent
+from core.registry import ToolRegistry
+from core.logger import AgentLogger
+from rich.console import Console
+from rich.panel import Panel
 
 # Load environment variables
 load_dotenv()
 
 model = ModelProvider()
+registry = ToolRegistry() # Empty registry for these agents
+console = Console()
 
 def reflexion_demo(task: str):
-    print(f"--- Reflexion Agent ---")
-    print(f"Task: {task}")
+    log_path = "examples/logs/03_reflexion_log.md"
     
-    # Step 1: Initial Attempt
-    print("\n[bold yellow]Step 1: Generating Initial Attempt...[/bold yellow]")
-    memory = Memory([{"role": "system", "content": "You are a creative writer."}])
-    memory.add_message("user", task)
+    console.print(Panel(f"[bold blue]Reflexion Agent[/bold blue]\n[dim]Task: {task}[/dim]", expand=False))
     
-    attempt = model.generate(memory.get_messages()).content
-    print(f"Attempt:\n{attempt}")
+    # Phase 1: Drafting
+    console.print("\n[bold yellow]\u2776 Phase 1: Generating Initial Attempt...[/bold yellow]")
+    writer_agent = Agent(
+        model=model,
+        memory=Memory(),
+        registry=registry,
+        system_prompt="You are a creative writer. Your goal is to produce a high-quality initial draft.",
+        log_path=log_path,
+        verbose=False
+    )
+    attempt = writer_agent.run(task)
+    console.print(Panel(attempt, title="Initial Attempt"))
     
-    # Step 2: Critique
-    print("\n[bold magenta]Step 2: Critiquing...[/bold magenta]")
-    critique_prompt = f"""Review the following text for style, tone, and logical clarity. 
-    Point out any flaws or areas for improvement.
-    Text: {attempt}"""
+    # Phase 2: Critique
+    console.print("\n[bold magenta]\u2777 Phase 2: Self-Critiquing...[/bold magenta]")
+    critic_agent = Agent(
+        model=model,
+        memory=Memory(),
+        registry=registry,
+        system_prompt="You are a critical reviewer. Review the provided text for style, tone, and logical clarity.",
+        log_path=log_path,
+        verbose=False
+    )
+    critique = critic_agent.run(f"Please critique this text:\n\n{attempt}")
+    console.print(Panel(critique, title="Critique"))
     
-    critique_memory = Memory([{"role": "system", "content": "You are a critical reviewer."}])
-    critique_memory.add_message("user", critique_prompt)
-    
-    critique = model.generate(critique_memory.get_messages()).content
-    print(f"Critique:\n{critique}")
-    
-    # Step 3: Revision
-    print("\n[bold cyan]Step 3: Revising...[/bold cyan]")
-    revision_prompt = f"""Revise the original text based on the following critique.
-    Original Text: {attempt}
-    Critique: {critique}"""
-    
-    memory.add_message("assistant", attempt)
-    memory.add_message("user", revision_prompt)
-    
-    final_output = model.generate(memory.get_messages()).content
-    print(f"Final Revised Output:\n{final_output}")
+    # Phase 3: Revision
+    console.print("\n[bold cyan]\u2778 Phase 3: Revised Output...[/bold cyan]")
+    revision_agent = Agent(
+        model=model,
+        memory=Memory(),
+        registry=registry,
+        system_prompt="You are an expert editor. Revise the original text based on the provided critique.",
+        log_path=log_path,
+        verbose=False
+    )
+    final_output = revision_agent.run(f"Original Text: {attempt}\n\nCritique: {critique}")
+    console.print(Panel(final_output, title="Final Revised Output", border_style="green"))
 
 if __name__ == "__main__":
     task = "Write a short poem about the concept of recursive agent loops in AI."
