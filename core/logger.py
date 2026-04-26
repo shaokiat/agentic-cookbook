@@ -7,7 +7,7 @@ class AgentLogger:
         self.log_path = log_path
         self.is_markdown = log_path.endswith(".md") if log_path else False
 
-    def log_event(self, data: Dict[str, Any]):
+    def log_event(self, data: Dict[str, Any], overwrite: bool = True):
         """
         Record an agent event to the log file.
         Handles formatting and directory creation.
@@ -20,7 +20,9 @@ class AgentLogger:
         if log_dir:
             os.makedirs(log_dir, exist_ok=True)
 
-        mode = "w" if data.get("event") == "run_start" else "a"
+        # Mode determination: 
+        # Only overwrite if it's the start of a run AND overwrite is explicitly True
+        mode = "w" if (data.get("event") == "run_start" and overwrite) else "a"
         
         with open(self.log_path, mode) as f:
             if self.is_markdown:
@@ -30,9 +32,10 @@ class AgentLogger:
 
     def _log_markdown(self, f, data: Dict[str, Any]):
         event = data.get("event", "event").upper()
-        step = f"Phase {data['step']}" if "step" in data else "General"
+        agent_name = data.get("agent_name", "Agent")
+        step = f"Step {data['step']}" if "step" in data else "General"
         
-        f.write(f"## {event} - {step}\n\n")
+        f.write(f"## {event} [{agent_name}] - {step}\n\n")
         
         if "user_input" in data:
             f.write(f"**User Input:** {data['user_input']}\n\n")

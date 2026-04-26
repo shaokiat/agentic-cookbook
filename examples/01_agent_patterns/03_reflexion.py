@@ -28,6 +28,7 @@ def reflexion_demo(task: str):
         registry=registry,
         system_prompt="You are a creative writer. Your goal is to produce a high-quality initial draft.",
         log_path=log_path,
+        name="Writer",
         verbose=False
     )
     attempt = writer_agent.run(task)
@@ -41,6 +42,8 @@ def reflexion_demo(task: str):
         registry=registry,
         system_prompt="You are a critical reviewer. Review the provided text for style, tone, and logical clarity.",
         log_path=log_path,
+        name="Critic",
+        overwrite=False,
         verbose=False
     )
     critique = critic_agent.run(f"Please critique this text:\n\n{attempt}")
@@ -54,6 +57,8 @@ def reflexion_demo(task: str):
         registry=registry,
         system_prompt="You are an expert editor. Revise the original text based on the provided critique.",
         log_path=log_path,
+        name="Editor",
+        overwrite=False,
         verbose=False
     )
     final_output = revision_agent.run(f"Original Text: {attempt}\n\nCritique: {critique}")

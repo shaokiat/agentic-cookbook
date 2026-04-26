@@ -16,7 +16,9 @@ class Agent:
         system_prompt: str = "You are a helpful assistant.",
         max_steps: int = 10,
         verbose: bool = True,
-        log_path: Optional[str] = None
+        log_path: Optional[str] = None,
+        name: str = "Agent",
+        overwrite: bool = True
     ):
         self.model = model
         self.memory = memory
@@ -24,6 +26,8 @@ class Agent:
         self.system_prompt = system_prompt
         self.max_steps = max_steps
         self.verbose = verbose
+        self.name = name
+        self.overwrite = overwrite
         self.logger = AgentLogger(log_path)
         self.console = Console()
 
@@ -37,7 +41,11 @@ class Agent:
         """
         self.memory.add_message("user", user_input)
         
-        self.logger.log_event({"event": "run_start", "user_input": user_input})
+        self.logger.log_event({
+            "event": "run_start", 
+            "user_input": user_input,
+            "agent_name": self.name
+        }, overwrite=self.overwrite)
 
         if self.verbose:
             self.console.print(Panel(f"[bold blue]User:[/bold blue] {user_input}"))
@@ -57,8 +65,9 @@ class Agent:
                 "step": steps,
                 "event": "think",
                 "content": response.content,
-                "tool_calls": response.tool_calls
-            })
+                "tool_calls": response.tool_calls,
+                "agent_name": self.name
+            }, overwrite=self.overwrite)
 
             # 2. Observe (Handle Content)
             if response.content:
@@ -98,8 +107,9 @@ class Agent:
                         "event": "act",
                         "tool": tool_name,
                         "arguments": tool_args,
-                        "observation": observation
-                    })
+                        "observation": observation,
+                        "agent_name": self.name
+                    }, overwrite=self.overwrite)
 
                     # Add tool result to memory
                     self.memory.add_message(
@@ -120,5 +130,10 @@ class Agent:
                 self.console.print("[bold red]Reached max steps safety limit.[/bold red]")
 
         final_answer = self.memory.get_messages()[-1]["content"] if self.memory.get_messages() else ""
-        self.logger.log_event({"event": "run_end", "final_answer": final_answer, "steps": steps})
+        self.logger.log_event({
+            "event": "run_end", 
+            "final_answer": final_answer, 
+            "steps": steps,
+            "agent_name": self.name
+        }, overwrite=self.overwrite)
         return final_answer
