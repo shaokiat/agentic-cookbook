@@ -2,11 +2,14 @@
 
 This category explores how agents retain information over time, handle large contexts, and utilize external knowledge.
 
+## Examples
+
+| File | Concept |
+| :--- | :--- |
+| [`01_windowed_memory.py`](./01_windowed_memory.py) | Short-term memory — sliding window that prunes old messages to stay within context limits |
+| [`02_markdown_persistence.py`](./02_markdown_persistence.py) | Intermediate memory — persist facts to a markdown file across session restarts ([guide](./02_markdown_persistence.md)) |
+
 ## Core Concepts to Explore
 1. **Short-term Memory**: Managing the immediate conversation window (sliding windows, summarization).
-2. **Long-term Memory (RAG)**: Using vector databases to retrieve relevant history or external documents.
-3. **Structured Memory**: Storing information in key-value stores or knowledge graphs instead of just flat text.
-4. **Entity Memory**: Tracking specific facts about people, places, or objects across sessions.
-
-## Suggested Next Example
-- `01_context_summarization.py`: An agent that automatically summarizes old messages when the context window is full.
+2. **Intermediate Memory**: Durable facts written to markdown files — survives restarts, human-readable, git-diffable.
+3. **Long-term Memory (RAG)**: Using vector databases to retrieve relevant history or external documents.

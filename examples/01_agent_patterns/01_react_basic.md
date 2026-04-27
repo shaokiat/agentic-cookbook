@@ -136,7 +136,7 @@ The `ToolRegistry` distinguishes between **LLM arguments** and **System context*
 ## Implementation Details
 
 ### Available Tools in this Example
-In [examples/01_agent_patterns/01_react_basic.py](../../examples/01_agent_patterns/01_react_basic.py), two tools are registered:
+In [01_react_basic.py](./01_react_basic.py), two tools are registered:
 - `list_files`: Lists contents of a directory.
 - `read_file_content`: Reads the contents of a specific file.
 

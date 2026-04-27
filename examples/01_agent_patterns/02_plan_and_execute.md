@@ -13,7 +13,7 @@ Unlike a pure **ReAct** agent that decides its next move on the fly, Plan-and-Ex
 
 ## Architecture
 
-This pattern is implemented in [examples/01_agent_patterns/02_plan_and_execute.py](../../examples/01_agent_patterns/02_plan_and_execute.py).
+This pattern is implemented in [02_plan_and_execute.py](./02_plan_and_execute.py).
 
 ### The Planner
 The planner is a simple model call with a system prompt that enforces strategic thinking. It produces a numbered list of steps which are passed to the executor as its primary instruction set.
@@ -68,7 +68,7 @@ To understand the internal mechanics, we enabled structured logging by passing a
 
 ### Step-by-Step Breakdown (Run Analysis)
 
-Following the run log [`02_plan_and_execute_log.md`](../../examples/logs/02_plan_and_execute_log.md) generated during a project analysis task:
+Following the run log [`02_plan_and_execute_log.md`](../logs/02_plan_and_execute_log.md) generated during a project analysis task:
 
 #### 1. Exploration (Step 1)
 - **Rationale**: The agent identifies the need to verify the local project structure.

@@ -14,7 +14,7 @@ Unlike a single-shot prompt, Reflexion introduces a "feedback loop" where the mo
 
 ## Architecture
 
-This pattern is implemented in [examples/01_agent_patterns/03_reflexion.py](../../examples/01_agent_patterns/03_reflexion.py).
+This pattern is implemented in [03_reflexion.py](./03_reflexion.py).
 
 In this implementation, we utilize three distinct agent personas to simulate a collaborative editorial process:
 
@@ -71,13 +71,13 @@ One of the challenges with multi-agent patterns is tracking which agent performe
 - **Agent Identity**: By passing a `name` to the constructor, every log entry (including reasoning loops and tool calls) is prefixed with that name in the Markdown logs.
 - **Non-Destructive Logging**: By setting `overwrite=False`, agents will append their actions to a shared log file instead of overwriting it at the start of each `run()`.
 
-This creates a unified "story" of the agentic interaction in a single file like [`03_reflexion_log.md`](../../examples/logs/03_reflexion_log.md).
+This creates a unified "story" of the agentic interaction in a single file like [`03_reflexion_log.md`](../logs/03_reflexion_log.md).
 
 ---
 
 ## Deep Dive: Run Analysis
 
-Following the run log [`03_reflexion_log.md`](../../examples/logs/03_reflexion_log.md), we can see the transition from a poetic draft to a refined final version.
+Following the run log [`03_reflexion_log.md`](../logs/03_reflexion_log.md), we can see the transition from a poetic draft to a refined final version.
 
 ### 1. The Feedback Signal
 The Critic identified that while the imagery was "rich," it was potentially "too abstract" for technical clarity.

@@ -44,9 +44,8 @@ def plan_and_execute(goal: str):
         system_prompt=f"""You are an executor agent. 
         Your task is to follow this plan precisely to achieve the goal:
         {plan}
-        
-        IMPORTANT: You are already in the project directory. Use the provided tools (list_files, read_file_content, etc.) to explore the local filesystem.""" ,
-        log_path="examples/logs/02_plan_and_execute_log.md"
+
+        IMPORTANT: You are already in the project directory. Use the provided tools (list_files, read_file_content, etc.) to explore the local filesystem."""
     )
     
     executor_agent.run("Begin executing the plan.")

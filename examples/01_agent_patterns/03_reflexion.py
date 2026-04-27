@@ -4,7 +4,6 @@ from core.model import ModelProvider
 from core.memory import Memory
 from core.agent import Agent
 from core.registry import ToolRegistry
-from core.logger import AgentLogger
 from rich.console import Console
 from rich.panel import Panel
 
@@ -16,8 +15,6 @@ registry = ToolRegistry() # Empty registry for these agents
 console = Console()
 
 def reflexion_demo(task: str):
-    log_path = "examples/logs/03_reflexion_log.md"
-    
     console.print(Panel(f"[bold blue]Reflexion Agent[/bold blue]\n[dim]Task: {task}[/dim]", expand=False))
     
     # Phase 1: Drafting
@@ -27,7 +24,6 @@ def reflexion_demo(task: str):
         memory=Memory(),
         registry=registry,
         system_prompt="You are a creative writer. Your goal is to produce a high-quality initial draft.",
-        log_path=log_path,
         name="Writer",
         verbose=False
     )
@@ -41,9 +37,7 @@ def reflexion_demo(task: str):
         memory=Memory(),
         registry=registry,
         system_prompt="You are a critical reviewer. Review the provided text for style, tone, and logical clarity.",
-        log_path=log_path,
         name="Critic",
-        overwrite=False,
         verbose=False
     )
     critique = critic_agent.run(f"Please critique this text:\n\n{attempt}")
@@ -56,9 +50,7 @@ def reflexion_demo(task: str):
         memory=Memory(),
         registry=registry,
         system_prompt="You are an expert editor. Revise the original text based on the provided critique.",
-        log_path=log_path,
         name="Editor",
-        overwrite=False,
         verbose=False
     )
     final_output = revision_agent.run(f"Original Text: {attempt}\n\nCritique: {critique}")
