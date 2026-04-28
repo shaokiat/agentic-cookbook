@@ -1,4 +1,13 @@
-import os
+"""
+Intermediate Memory: Markdown Persistence
+
+Demonstrates how facts can survive session restarts by writing them to a markdown
+file and injecting that file into the system prompt at the start of each new session.
+The agent in Session 2 starts with a completely empty Memory() yet recalls everything
+saved in Session 1 — because the facts were persisted to disk, not to the context window.
+
+Docs: examples/02_memory_management/01_markdown_persistence.md
+"""
 from pathlib import Path
 from dotenv import load_dotenv
 from core.model import ModelProvider
