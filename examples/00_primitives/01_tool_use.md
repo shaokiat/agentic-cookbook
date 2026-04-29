@@ -217,13 +217,6 @@ Context injection via `context=self` is convenient but passes a wide-open handle
 - **Prompt injection via tool results** — external content fetched by a tool (webpages, files) lands in memory as an observation. A malicious payload could instruct the model to invoke destructive context-injected tools. Worth exploring: sanitizing external content before it enters memory.
 - **Subagent resource amplification** — `call_subagent` reuses `context.model` (same API credentials) with no recursion limit. Worth exploring: tracking recursion depth on the agent and refusing to spawn beyond a threshold.
 
-## Open Claw mapping
-
-| This cookbook | Open Claw |
-| :------------ | :-------- |
-| `core/registry.py` — schema generation | `agent_tools.py` — all tools inherit a common base with OpenAI-compatible schema |
-| `registry.call_tool()` — execution | `agent_runtime.py` — tool dispatch inside the agent loop |
-
 ## Running the example
 
 ```bash

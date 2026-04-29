@@ -67,12 +67,3 @@ The scaling limit is the key weakness: every fact is injected on every session r
 python examples/02_memory_management/01_markdown_persistence.py
 ```
 
-## In Open Claw
-
-| This example | Open Claw |
-|:-------------|:----------|
-| `memory_store.md` | `MEMORY.md` — global project memory index |
-| `save_fact` tool | agent writes to `MEMORY.md` during a run |
-| System prompt injection | `MEMORY.md` contents injected at every session start |
-| — | `CLAUDE.md` — workspace instructions, same injection pattern |
-| — | `journal/` files — per-session discoveries |

@@ -142,17 +142,6 @@ Claude Code implements this in `token_budget.py`, which updates the budget messa
 - **Lost observations**: With auto-snip, evicted tool results cause the model to re-derive or hallucinate information it already obtained.
 - **Repetitive loops**: When the agent can't see its earlier attempts, it may re-call the same tool with the same arguments repeatedly.
 
-## Open Claw mapping
-
-| This cookbook | Claude Code / Open Claw |
-| :------------ | :-------- |
-| `core/memory.py` | `compact.py` (auto-snip, auto-compact), `token_budget.py` |
-| Auto-snip | `compact.py`: evicts oldest messages at a configurable threshold |
-| Auto-compact | `compact.py`: compresses history via a model call; triggered at ~95% usage or via `/compact` |
-| Output truncation | inline in tool dispatch; not a standalone module |
-| Token budget signaling | `token_budget.py`: injects remaining budget into system prompt each turn |
-| Crash on overflow | reactive compaction: catches `prompt_too_long`, compacts, retries |
-
 ## Running the example
 
 ```bash

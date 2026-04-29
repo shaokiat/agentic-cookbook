@@ -105,14 +105,6 @@ if steps >= self.max_steps:
 | Code generation + verification loop | 20–30 |
 | Open-ended planning | 30–50 (with cost monitoring) |
 
-## Open Claw mapping
-
-| This cookbook | Open Claw |
-| :------------ | :-------- |
-| `max_steps` in `Agent.__init__` | Turn limits, tool-call caps per session |
-| Terminal tool call pattern | `finish_reason` handling; continuation on `finish_reason=length` |
-| Step cap warning | `cost_tracker.py` — budget exhaustion triggers a graceful stop |
-
 ## Running the example
 
 ```bash

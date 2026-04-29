@@ -8,19 +8,19 @@ Both are spiritual descendants of Claude Code, designed to run a coding/personal
 
 ## Systems at a Glance
 
-| Dimension | OpenClaw | Nanobot |
-|:----------|:---------|:--------|
-| Language | TypeScript (ESM, Node 22+) | Python 3.11+ |
-| Size | Very large (~300+ source files in agents/ alone) | Small (~15 core files) |
-| Scope | Full product: CLI, iOS/Android/macOS apps, web gateway | Agent loop + channels + memory |
-| Target | Production agent with full platform support | Research-ready, hackable agent |
-| Channels | Desktop app, mobile apps, Telegram, Discord, Slack, … | Telegram, Discord, Slack, WeChat, Feishu, Email, WebUI, … |
-| Memory | Context compaction + skills + memory search | MEMORY.md + history.jsonl + Dream processor |
-| Plugin system | Manifest-based plugins via `openclaw/plugin-sdk` | SKILL.md manifests |
-| Tool permission | Per-tool policy pipeline + sandboxing | Config-gated (exec, web, workspace restriction) |
-| Multi-agent | Subagent registry with depth limits, topology | SpawnTool + SubagentManager |
-| MCP | Stdio + SSE transport | Stdio transport |
-| Session | File-backed, per-agent-id, write-locked | JSONL per-session-key, atomic writes |
+| Dimension       | OpenClaw                                               | Nanobot                                                   |
+| :-------------- | :----------------------------------------------------- | :-------------------------------------------------------- |
+| Language        | TypeScript (ESM, Node 22+)                             | Python 3.11+                                              |
+| Size            | Very large (~300+ source files in agents/ alone)       | Small (~15 core files)                                    |
+| Scope           | Full product: CLI, iOS/Android/macOS apps, web gateway | Agent loop + channels + memory                            |
+| Target          | Production agent with full platform support            | Research-ready, hackable agent                            |
+| Channels        | Desktop app, mobile apps, Telegram, Discord, Slack, …  | Telegram, Discord, Slack, WeChat, Feishu, Email, WebUI, … |
+| Memory          | Context compaction + skills + memory search            | MEMORY.md + history.jsonl + Dream processor               |
+| Plugin system   | Manifest-based plugins via `openclaw/plugin-sdk`       | SKILL.md manifests                                        |
+| Tool permission | Per-tool policy pipeline + sandboxing                  | Config-gated (exec, web, workspace restriction)           |
+| Multi-agent     | Subagent registry with depth limits, topology          | SpawnTool + SubagentManager                               |
+| MCP             | Stdio + SSE transport                                  | Stdio transport                                           |
+| Session         | File-backed, per-agent-id, write-locked                | JSONL per-session-key, atomic writes                      |
 
 ---
 
@@ -256,17 +256,20 @@ workspace/
 Three components manage this:
 
 **MemoryStore** — pure file I/O:
+
 - Reads/writes `MEMORY.md`, `USER.md`, `SOUL.md`
 - Appends timestamped entries to `history.jsonl` (JSONL format, cursor-indexed)
 - Auto-migrates legacy `HISTORY.md` on first run
 
 **Consolidator** — token-budget-triggered LLM summarization:
+
 - Monitors session prompt size before each turn
 - When over budget: picks a user-turn boundary, summarizes old messages → appends to `history.jsonl`
 - Up to 5 consolidation rounds per check, each round targeting 50% of budget
 - Falls back to raw-archive if LLM call fails
 
 **Dream** — two-phase background memory processor (runs on a cron):
+
 ```
 Phase 1: Plain LLM call
     input:  unprocessed history.jsonl entries + current MEMORY.md + USER.md + SOUL.md
@@ -338,17 +341,17 @@ This means interrupted turns (e.g. process kill) don't lose context — they're 
 
 ## Architectural Comparison
 
-| Pattern | OpenClaw | Nanobot | Cookbook analogue |
-|:--------|:---------|:--------|:-----------------|
-| Agent loop | Streaming-first, subscriber chain | Async task-per-session, message bus | `core/agent.py` |
-| Tool dispatch | Policy pipeline → sandboxed execution | Config-gated, concurrent | `core/registry.py` |
-| Context compaction | LLM summarization + identifier preservation | Consolidator (token budget) + AutoCompact (TTL) | `examples/00_primitives/02_context_window.py` |
-| Intermediate memory | `CLAUDE.md` injection via `system-prompt.ts` | `MEMORY.md` + `USER.md` + `SOUL.md` injection | `examples/02_memory_management/01_markdown_persistence.py` |
-| Long-term memory | `memory-search.ts` (semantic search) | `history.jsonl` + Dream two-phase processor | `examples/02_memory_management/02_hybrid_search.py` |
-| Sub-agents | Registry + announce-based async delivery | SpawnTool + message bus routing | `examples/03_multi_agent_systems/` |
-| Plugin/extension | Manifest + SDK boundary + hook policy | SKILL.md manifests + hook system | — |
-| Session persistence | Per-agent-id files, write-locked | Per-session-key JSONL, atomic, crash recovery | — |
-| Channels | Desktop app, mobile gateway, chat platforms | Chat platforms + WebUI + OpenAI-compatible API | — |
+| Pattern             | OpenClaw                                     | Nanobot                                         | Cookbook analogue                                          |
+| :------------------ | :------------------------------------------- | :---------------------------------------------- | :--------------------------------------------------------- |
+| Agent loop          | Streaming-first, subscriber chain            | Async task-per-session, message bus             | `core/agent.py`                                            |
+| Tool dispatch       | Policy pipeline → sandboxed execution        | Config-gated, concurrent                        | `core/registry.py`                                         |
+| Context compaction  | LLM summarization + identifier preservation  | Consolidator (token budget) + AutoCompact (TTL) | `examples/00_primitives/02_context_window.py`              |
+| Intermediate memory | `CLAUDE.md` injection via `system-prompt.ts` | `MEMORY.md` + `USER.md` + `SOUL.md` injection   | `examples/02_memory_management/01_markdown_persistence.py` |
+| Long-term memory    | `memory-search.ts` (semantic search)         | `history.jsonl` + Dream two-phase processor     | `examples/02_memory_management/02_hybrid_search.py`        |
+| Sub-agents          | Registry + announce-based async delivery     | SpawnTool + message bus routing                 | `examples/03_multi_agent_systems/`                         |
+| Plugin/extension    | Manifest + SDK boundary + hook policy        | SKILL.md manifests + hook system                | —                                                          |
+| Session persistence | Per-agent-id files, write-locked             | Per-session-key JSONL, atomic, crash recovery   | —                                                          |
+| Channels            | Desktop app, mobile gateway, chat platforms  | Chat platforms + WebUI + OpenAI-compatible API  | —                                                          |
 
 ---
 
@@ -367,6 +370,7 @@ Nanobot's `MessageBus` decouples channels from the agent loop entirely. A channe
 Dream is the most novel architectural pattern across both systems. Rather than a single "write to memory" step, memory updates happen asynchronously via a two-phase process: one LLM call to analyze, one tool-using AgentRunner to apply targeted edits.
 
 **Why it matters**:
+
 - Memory updates are incremental rather than destructive rewrites
 - Git auto-commit makes memory changes auditable
 - Stale-fact detection (per-line ages) is automated
@@ -388,7 +392,7 @@ OpenClaw's architecture rule is strict: **core stays extension-agnostic**. All e
 
 **Why it matters**: Third-party plugins work because there are no hidden contracts. The boundary is enforced structurally, not just by convention.
 
-**Cookbook implication**: Tool registration in `core/registry.py` follows the same principle — tools are registered *to* the agent, not built *into* it.
+**Cookbook implication**: Tool registration in `core/registry.py` follows the same principle — tools are registered _to_ the agent, not built _into_ it.
 
 ### Pattern 5: Per-Session Concurrency with Ordering Guarantees (Nanobot)
 
@@ -402,26 +406,26 @@ Nanobot processes messages serially within a session (via `asyncio.Lock` per ses
 
 ## Mapping to the Cookbook Concept Ladder
 
-| Cookbook Level | Concept | OpenClaw component | Nanobot component |
-|:--------------|:--------|:-------------------|:------------------|
-| Level 1: Primitives | Tool use | `pi-tools.ts`, `bash-tools.ts` | `tools/` directory |
-| Level 1: Primitives | Context window | `compaction.ts`, `context-window-guard.ts` | `autocompact.py`, `Consolidator` |
-| Level 1: Primitives | Stop condition | `pi-embedded-runner.ts` turn limits | `AgentRunner.max_iterations` |
-| Level 2: Loop patterns | ReAct | `pi-embedded-subscribe.ts` tool dispatch | `AgentRunner.run()` |
-| Level 2: Loop patterns | Plan-and-Execute | `runtime-plan/` | — (via sub-agents) |
-| Level 2: Loop patterns | Reflexion | — | — |
-| Level 3: Memory | Short-term (context) | `compaction.ts` | `Consolidator.maybe_consolidate_by_tokens()` |
-| Level 3: Memory | Intermediate (files) | `CLAUDE.md` via `system-prompt.ts` | `MEMORY.md` / `SOUL.md` / `USER.md` |
-| Level 3: Memory | Long-term (retrieval) | `memory-search.ts` | `Dream` + `history.jsonl` |
-| Level 4: Tool patterns | Tiered permissions | `tool-policy-pipeline.ts` + sandbox | Config-gated enable flags |
-| Level 4: Tool patterns | Parallel tool calls | `pi-embedded-subscribe.ts` | `concurrent_tools=True` in `AgentRunner` |
-| Level 4: Tool patterns | Error recovery | `compaction.retry.ts`, failover | `AgentRunner` retry + `restore_runtime_checkpoint()` |
-| Level 5: Multi-agent | Orchestrator/worker | `subagent-registry.ts` + announce | `SubagentManager` + `SpawnTool` |
-| Level 5: Multi-agent | Session persistence | Per-agent-id files, write-locked | Per-session-key JSONL, atomic |
-| Level 5: Multi-agent | Background agents | Subagent async lifecycle | Background asyncio tasks |
-| Level 6: Observability | Tracing | `anthropic-payload-log.ts`, `cache-trace.ts` | `loguru` + tool events |
-| Level 7: Extensibility | Plugin system | `plugin-sdk/` + manifests | SKILL.md + `AgentHook` |
-| Level 7: Extensibility | MCP | `mcp-stdio-transport.ts` + SSE | `tools/mcp.py` stdio transport |
+| Cookbook Level         | Concept               | OpenClaw component                           | Nanobot component                                    |
+| :--------------------- | :-------------------- | :------------------------------------------- | :--------------------------------------------------- |
+| Level 1: Primitives    | Tool use              | `pi-tools.ts`, `bash-tools.ts`               | `tools/` directory                                   |
+| Level 1: Primitives    | Context window        | `compaction.ts`, `context-window-guard.ts`   | `autocompact.py`, `Consolidator`                     |
+| Level 1: Primitives    | Stop condition        | `pi-embedded-runner.ts` turn limits          | `AgentRunner.max_iterations`                         |
+| Level 2: Loop patterns | ReAct                 | `pi-embedded-subscribe.ts` tool dispatch     | `AgentRunner.run()`                                  |
+| Level 2: Loop patterns | Plan-and-Execute      | `runtime-plan/`                              | — (via sub-agents)                                   |
+| Level 2: Loop patterns | Reflexion             | —                                            | —                                                    |
+| Level 3: Memory        | Short-term (context)  | `compaction.ts`                              | `Consolidator.maybe_consolidate_by_tokens()`         |
+| Level 3: Memory        | Intermediate (files)  | `CLAUDE.md` via `system-prompt.ts`           | `MEMORY.md` / `SOUL.md` / `USER.md`                  |
+| Level 3: Memory        | Long-term (retrieval) | `memory-search.ts`                           | `Dream` + `history.jsonl`                            |
+| Level 4: Tool patterns | Tiered permissions    | `tool-policy-pipeline.ts` + sandbox          | Config-gated enable flags                            |
+| Level 4: Tool patterns | Parallel tool calls   | `pi-embedded-subscribe.ts`                   | `concurrent_tools=True` in `AgentRunner`             |
+| Level 4: Tool patterns | Error recovery        | `compaction.retry.ts`, failover              | `AgentRunner` retry + `restore_runtime_checkpoint()` |
+| Level 5: Multi-agent   | Orchestrator/worker   | `subagent-registry.ts` + announce            | `SubagentManager` + `SpawnTool`                      |
+| Level 5: Multi-agent   | Session persistence   | Per-agent-id files, write-locked             | Per-session-key JSONL, atomic                        |
+| Level 5: Multi-agent   | Background agents     | Subagent async lifecycle                     | Background asyncio tasks                             |
+| Level 6: Observability | Tracing               | `anthropic-payload-log.ts`, `cache-trace.ts` | `loguru` + tool events                               |
+| Level 7: Extensibility | Plugin system         | `plugin-sdk/` + manifests                    | SKILL.md + `AgentHook`                               |
+| Level 7: Extensibility | MCP                   | `mcp-stdio-transport.ts` + SSE               | `tools/mcp.py` stdio transport                       |
 
 ---
 
