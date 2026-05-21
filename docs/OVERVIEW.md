@@ -138,13 +138,15 @@ theta-agent/
 | v0.3 | Greeks | Delta, gamma, theta, vega per contract via BSM; system prompt updated | extends `get_options_chain` | Medium |
 | v0.4 | Financial metrics | Valuation ratios, margins, growth rates, analyst consensus, balance sheet health via yfinance | `get_financials` | Low |
 | v0.5 | Conversation memory + state | Full `messages[]` history in chat loop; `/summary`, `/strategy`, `/position` slash commands; per-ticker JSON state store (position persistence + session history injected into future prompts) | none | Low |
-| v0.6 | Modular tools | `tools/` directory with one file per tool; thin theta.py | refactored, no new tools | Low (refactor) |
-| v0.7 | MCP integration | Brave Search MCP server; unified tool registry for native + MCP | `[mcp] brave_search` | Medium |
+| v0.6 | Modular tools | `tools/` directory with one file per tool; `prompts/system.md`; native `search_web` (Brave Search REST API) | `search_web` | Low (refactor) |
+| v0.7 | IV surface + earnings | `get_earnings_dates` tool; `get_options_chain` extended to multi-expiry with iv_excess ranking and earnings_count annotation; system prompt updated for structured analysis chain | `get_earnings_dates`, extends `get_options_chain` | Medium |
 | v0.8 | IBKR positions | Read live account positions from IBKR Client Portal Web API; context-aware strategy suggestions against existing holdings | `get_ibkr_positions` | Medium |
+| v0.9 | Textual TUI | Split-pane terminal UI (`theta_ui.py`); agent callbacks replace `print()`/`input()`; CLI (`theta.py`) unchanged | none new | Medium |
 | v1.0 | Production baseline | Error handling, rate limiting, response caching, `analyses/` JSON output, polished README | none new | Medium-high |
 
 **Backlog (deferred, not scheduled):**
 - SEC filings (`get_sec_filing`): 10-K/10-Q/8-K via EDGAR free API — parsing complexity and token cost outweigh marginal value over yfinance financial metrics
+- MCP integration: Brave Search MCP server as an alternative to the native `search_web` tool; unified tool registry for native + MCP tools; deferred because native search_web already covers the use case
 - Deep financial analysis: structured multi-dimensional analysis using data already retrieved by existing tools — cross-referencing valuation, growth, margins, analyst consensus, and options metrics into a comparative breakdown (e.g. vs sector peers, vs historical ranges); prompt engineering deferred
 - Prompt/instruction evaluation: as each version adds richer context (Greeks, financial metrics, analyst data), evaluate whether the system prompt is using that context effectively — candidate approaches include: (1) LLM-as-judge scoring strategy outputs against a rubric (correct strategy family for IV regime, Greeks cited in rationale, financials used to qualify thesis); (2) golden-set regression — a small set of saved ticker snapshots with expected strategy fields, run after each prompt change to detect regressions; (3) ablation — compare outputs with and without a new context block to confirm Claude actually uses it rather than ignoring it
 
@@ -160,8 +162,74 @@ theta-agent/
 | `get_news` | v0.1 | yfinance `.news` | None | 15 min |
 | `get_options_chain` | v0.2 | yfinance `.option_chain` | None | 5 min |
 | `get_financials` | v0.4 | yfinance `.info` | None | Session (once) |
-| `[mcp] brave_search` | v0.7 | Brave Search MCP | Brave API key | 15 min |
+| `search_web` | v0.6 | Brave Search REST API | `BRAVE_API_KEY` | 15 min |
+| `get_earnings_dates` | v0.7 | yfinance (3-tier fallback) | None | Session (once) |
 | `get_ibkr_positions` | v0.8 | IBKR Client Portal Web API | None (CP Gateway session) | Session (once) |
+
+### v0.7 Tool Specifications
+
+#### `get_earnings_dates(ticker)`
+
+Fetches upcoming earnings dates using a 3-tier yfinance fallback (most reliable first):
+1. `ticker.get_earnings_dates(limit=8)` — preferred
+2. `ticker.calendar["Earnings Date"]` — handles dict and DataFrame forms
+3. `ticker.earnings_dates` — property fallback
+
+Returns up to 4 future earnings dates as a list of `{date, days_until}` objects. Returns an empty list gracefully if no data is available (not all tickers have earnings — ETFs, SPACs, etc.).
+
+```json
+{
+  "ticker": "AAPL",
+  "earnings_dates": [
+    {"date": "2026-07-31", "days_until": 71},
+    {"date": "2026-10-30", "days_until": 162}
+  ]
+}
+```
+
+#### `get_options_chain(ticker)` — enhanced in v0.7
+
+Fetches the nearest 3 expiries (each ≥ 14 days out), wider strike band (15% of spot in each direction), then fits an IV surface via OLS and annotates each contract with `iv_excess` and `earnings_count`.
+
+**IV surface model:** `IV ≈ a + b·m + c·m² + d·√T + e·m·√T` where `m = log(K/S)` (log-moneyness) and `T = DTE/365`. Fit globally across all (strike, expiry) pairs with `iv > 0.02` and `dte > 0`. Requires ≥ 5 valid data points; gracefully degrades to `iv_excess = 0.0` if fewer.
+
+**`iv_excess`:** `iv - iv_fitted` — how many volatility points the contract's actual IV exceeds (or is below) the modeled surface. Positive = IV rich, negative = IV cheap.
+
+**`earnings_count`:** Number of upcoming earnings dates that fall within `(today, expiry_date]`. Contracts with `earnings_count > 0` span at least one earnings event.
+
+**Output structure:**
+
+```json
+{
+  "current_price": 189.42,
+  "iv_surface": {"r_squared": 0.87, "n_points": 42},
+  "expiries": [
+    {
+      "expiry": "2026-06-20",
+      "dte": 30,
+      "earnings_count": 0,
+      "calls": [
+        {
+          "strike": 190.0, "bid": 3.10, "ask": 3.30,
+          "iv": 0.28, "iv_fitted": 0.24, "iv_excess": 0.04,
+          "volume": 1200, "open_interest": 8400,
+          "delta": 0.48, "gamma": 0.042, "theta": -0.067, "vega": 0.19
+        }
+      ],
+      "puts": [...]
+    },
+    {
+      "expiry": "2026-07-18",
+      "dte": 58,
+      "earnings_count": 1,
+      "calls": [...],
+      "puts": [...]
+    }
+  ]
+}
+```
+
+Within each expiry, calls and puts are sorted descending by `iv_excess` (richest IV first).
 
 ---
 
@@ -332,7 +400,94 @@ Goodbye!
 
 ---
 
-## 7. System Prompt Versioning
+## 7. Analysis Architecture (v0.7+)
+
+### The Reasoning Chain
+
+The core design principle: Claude should follow an explicit, ordered reasoning chain rather than synthesizing all data simultaneously. Each step has a specific question, specific inputs, and a specific output that feeds the next step. The system prompt enforces this chain.
+
+```
+Step 1: Directional Thesis
+    Inputs:  get_price_data, get_financials
+    Question: Is the stock trending up, down, or sideways? Is the valuation stretched?
+    Output:  Bullish / Bearish / Neutral + conviction level
+
+Step 2: Event Risk Assessment
+    Inputs:  get_earnings_dates, get_news, search_web
+    Question: Is there a known binary event? Which expiries span it?
+    Output:  Event timeline + which expiry dates are earnings-exposed
+
+Step 3: IV Regime
+    Inputs:  get_options_chain (iv_excess, iv_surface r²)
+    Question: Are options currently rich or cheap relative to the modeled surface?
+    Output:  IV rich / cheap / neutral — per expiry and per strike
+
+Step 4: Strategy Family
+    Inputs:  Step 1 output × Step 3 output → strategy matrix (Section 8)
+    Question: Which strategy family fits this thesis + IV environment?
+    Output:  One strategy family (e.g. bull put spread, iron condor)
+
+Step 5: Contract Selection
+    Inputs:  get_options_chain (iv_excess ranking, OI, Greeks)
+    Question: Which specific strikes and expiry best express the strategy?
+    Output:  Exact contracts — strike, expiry, bid/ask, max profit/loss, breakeven
+```
+
+### Why This Order Matters
+
+Steps 1 and 2 are computed before touching the options chain. This prevents the common failure mode where Claude anchors on a high-IV contract and reverse-engineers a directional thesis to justify selling it. The thesis is derived from fundamentals and price action; the options chain is used only to express it efficiently.
+
+Step 3 uses `iv_excess` rather than raw IV. Raw IV of 45% is ambiguous — whether it is elevated or compressed depends on the stock's normal range, its term structure, and current skew. `iv_excess` normalises this: a contract 8 vol points above the modeled surface is rich regardless of its absolute IV level.
+
+Step 5 uses `iv_excess` ranking for contract selection within the chosen strategy family:
+- **Sell strategies** (credit spreads, covered calls, cash-secured puts): pick legs with the highest `iv_excess` — these contracts are the most overpriced by the surface model
+- **Buy strategies** (debit spreads, long calls/puts): pick legs with the lowest `iv_excess` — these contracts are the cheapest relative to the surface
+- **Spread strategies**: sell the rich leg, buy the cheap leg — `iv_excess` difference between legs is the mispricing captured
+
+### Earnings-Aware Expiry Selection
+
+When `earnings_count > 0` on an expiry, that contract spans a known binary event. The strategy choice should be deliberate, not accidental:
+
+```
+Earnings in the expiry window:
+  → IV is typically inflated (event premium baked in)
+  → Selling: attractive premium but binary outcome risk — prefer defined-risk spreads
+  → Buying: IV crush post-earnings will erode value even if direction is correct
+
+No earnings in the expiry window:
+  → IV reflects ongoing vol; iv_excess is a cleaner signal
+  → Pre-earnings expiry + upcoming earnings: IV may still be elevated in sympathy
+  → Recommend flagging which scenario applies and letting the user decide
+```
+
+### IV Surface Reliability
+
+The surface fit produces an `r_squared` value. Below 0.70, the model has poor fit (too few data points, wide bid-ask spreads making IV noisy, or a genuinely unusual skew profile). When `r_squared < 0.70`, treat `iv_excess` as directional guidance only and fall back to raw IV comparisons and OI as primary signals.
+
+### Data Flow for v0.7 Research Phase
+
+All five tools are called in the first Claude API turn (parallel tool use). Claude should then reason through steps 1-5 sequentially in its synthesis turn:
+
+```
+Tool calls (parallel, API Turn 1):
+  get_price_data(ticker)
+  get_news(ticker)
+  get_financials(ticker)
+  get_earnings_dates(ticker)   ← new in v0.7
+  get_options_chain(ticker)    ← now returns multi-expiry + iv_excess
+
+Synthesis (API Turn 2):
+  1. Directional thesis from price + financials
+  2. Event timeline from earnings_dates + news
+  3. IV regime from iv_surface r² and per-contract iv_excess
+  4. Strategy family from thesis × IV regime matrix
+  5. Specific contracts using iv_excess ranking + OI + Greeks
+  6. Formatted recommendation with all required fields
+```
+
+---
+
+## 8. System Prompt Versioning
 
 ### v0.1 System Prompt
 
@@ -352,7 +507,8 @@ Stored as `SYSTEM_PROMPT` constant in `theta/prompts.py`. Under 200 words. Cover
 | v0.3 | Instructions for interpreting Greeks: use delta for directional exposure, theta decay for calendar positioning, vega for IV sensitivity |
 | v0.4 | Instructions for using financial metrics (valuation ratios, margins, growth, analyst consensus) to qualify or challenge the options thesis |
 | v0.5 | `/summary` and `/strategy` slash command definitions and expected output format |
-| v0.7 | Instructions for prioritising Brave Search results over yfinance news when both are available |
+| v0.6 | Instructions for prioritising web search results over yfinance news when both are available |
+| v0.7 | Signal scorecard format (5 signals, For/Against/Confidence per signal, COMPOSITE block); scoring rubrics with explicit anchor points for each signal; strategy family matrix from Directional × IV Regime; Event Risk / Conviction / Liquidity modifiers; "Why not" and Sensitivity fields in recommendation; `/scorecard` slash command |
 
 ### Prompt File Migration (v0.6)
 
@@ -403,17 +559,182 @@ Given the directional thesis and IV environment derived from data, Claude should
 
 ### IV Environment Thresholds
 
-Until a proper IV percentile calculation is available (requires historical data):
-- **Low IV proxy:** implied_volatility from yfinance < 0.30, OR beta < 0.8
-- **High IV proxy:** implied_volatility > 0.50, OR recent earnings/catalyst within 2 weeks
-- When IV data is unavailable, Claude should note the limitation and default to defined-risk spreads
+**v0.7+ (preferred):** Use `iv_excess` from the options chain surface fit as the primary IV signal:
+- `iv_excess > 0.04` (4+ vol points rich): IV is elevated at this strike relative to the surface — favors premium selling
+- `iv_excess < -0.04` (4+ vol points cheap): IV is compressed — favors buying
+- `|iv_excess| ≤ 0.02`: no strong mispricing; use raw IV level, OI, and Greeks as primary signals
+- If `iv_surface.r_squared < 0.70`: surface fit is unreliable; fall back to the raw IV proxies below
 
-### Earnings Calendar Note
+**Raw IV proxies (fallback when iv_excess is unavailable or unreliable):**
+- **Low IV:** `atm_iv < 0.30`, OR beta < 0.8
+- **High IV:** `atm_iv > 0.50`, OR earnings within 2 weeks
+- When IV data is entirely unavailable, default to defined-risk spreads and note the limitation
 
-When news mentions an upcoming earnings report, Claude must:
-1. Flag that IV crush risk exists post-earnings
-2. Note whether the proposed strategy is long or short vega
-3. Suggest the user evaluate whether to enter before or after the event
+### Contract Selection Using IV Surface (v0.7+)
+
+For every strategy, use `iv_excess` to select the most favorable specific contracts within the chosen strategy family:
+
+| Strategy type | Selection rule |
+|---|---|
+| Sell single-leg (CSP, covered call) | Highest `iv_excess` within delta constraints |
+| Buy single-leg (long call/put) | Lowest `iv_excess` within delta constraints |
+| Credit spread | Sell leg: highest `iv_excess`; buy leg: lowest `iv_excess` available for the wing |
+| Debit spread | Buy leg: lowest `iv_excess`; sell leg: highest `iv_excess` available for the wing |
+| Iron condor | Both short legs: highest `iv_excess` on each side; wings: lowest available |
+
+If multiple contracts have similar `iv_excess`, break ties by open interest (higher OI = better liquidity).
+
+### Earnings Calendar
+
+When `get_earnings_dates` returns upcoming dates, Claude must evaluate each recommended expiry against those dates:
+
+1. If `earnings_count > 0` on the recommended expiry: explicitly state which earnings event(s) fall within the window, the approximate date, and the strategy implication (long vega benefits from the event premium; short vega risks IV crush post-print)
+2. If `earnings_count = 0` but earnings is within 14 days of the expiry: note that IV in adjacent expiries may still be elevated in sympathy
+3. Always state whether the recommended strategy is long or short vega
+4. If the user has not expressed a preference on earnings exposure: suggest the pre-earnings expiry for defined-risk structures and flag the post-earnings expiry as an alternative if they want to capture the event premium
+
+---
+
+### Signal Scorecard Framework (v0.7+)
+
+Every Phase 1 output begins with a scored signal scorecard before the strategy recommendation. The scorecard is Claude's judgment, not a mechanical calculation — but it must follow three discipline rules:
+
+1. **Evidence first, score second.** List the supporting and contrary evidence for each signal, then assign the score. The number should feel like a conclusion, not an assertion.
+2. **Counterargument required.** Every signal must name the strongest piece of evidence pointing against its score. This prevents cherry-picking.
+3. **Confidence qualifier.** Each signal carries High / Medium / Low data confidence based on how complete the underlying data is.
+
+#### The Five Signals
+
+| Signal | What it measures | Primary inputs | Score anchor |
+|---|---|---|---|
+| **Directional Bias** | Bull / bear / neutral conviction | Price trend, financials, analyst consensus, news | 1=strong bear, 5=neutral, 10=strong bull |
+| **IV Regime** | Whether options are rich or cheap | `iv_excess`, `iv_surface.r_squared`, ATM IV | 1=very cheap, 5=fair value, 10=very rich |
+| **Event Risk** | Proximity and impact of binary events | `earnings_dates`, `earnings_count` on target expiry | 1=no catalyst, 10=earnings in <7 days spanning expiry |
+| **Conviction** | Internal signal agreement | Alignment between price, news, fundamentals, analyst | 1=all signals diverge, 10=all signals aligned |
+| **Liquidity** | Execution quality at target strikes | Bid-ask as % of mid, open interest | 1=illiquid, 10=tight spreads and deep OI |
+
+#### Scoring Anchors
+
+**Directional Bias**
+- 9-10: Price trending strongly, analyst consensus Buy or Strong Buy, positive earnings growth, news broadly constructive — all sub-signals aligned
+- 7-8: Most signals bullish; one neutral or mildly contradictory data point
+- 5-6: Genuinely mixed — one bullish, one bearish, or all neutral; no clear edge
+- 3-4: Most signals bearish; one neutral or mildly constructive
+- 1-2: All sub-signals bearish and aligned
+
+**IV Regime**
+- 9-10: `iv_excess ≥ 0.08` AND `r² ≥ 0.70`
+- 7-8: `iv_excess` 0.04–0.08 AND `r² ≥ 0.70`
+- 5-6: `|iv_excess| < 0.04`, OR `r² < 0.70` (unreliable surface)
+- 3-4: `iv_excess` −0.08 to −0.04
+- 1-2: `iv_excess ≤ −0.08`
+
+**Event Risk**
+- 9-10: Earnings within 7 days AND `earnings_count > 0` on target expiry
+- 7-8: Earnings 8–21 days AND spans the target expiry
+- 5-6: Earnings 22–45 days AND spans expiry; OR earnings <21 days but pre-expiry
+- 3-4: Earnings 45–90 days, does not span expiry
+- 1-2: No upcoming earnings, or next event > 90 days out
+
+**Conviction**
+- 9-10: 4+ directional sub-signals aligned with no contradictions
+- 7-8: 3 sub-signals aligned, 1 neutral or ambiguous
+- 5-6: 2 aligned, 1–2 directly contradictory (genuinely uncertain)
+- 3-4: More sub-signals contra the directional score than supporting it
+- 1-2: Score is driven by a single data point; all others point the other way
+
+**Liquidity**
+- 9-10: Bid-ask < 2% of mid AND OI > 5,000
+- 7-8: Bid-ask 2–5% of mid OR OI 1,000–5,000
+- 5-6: Bid-ask 5–10% of mid OR OI 500–1,000
+- 3-4: Bid-ask 10–20% of mid OR OI 100–500
+- 1-2: Bid-ask > 20% of mid AND OI < 100
+
+#### Strategy Selection from Scores
+
+**Step 1 — Strategy family** from Directional × IV Regime:
+
+| | IV Cheap (1–4) | IV Fair (5–6) | IV Rich (7–10) |
+|---|---|---|---|
+| **Bullish (7–10)** | Long call / Bull call spread | Bull call spread | Bull put spread / CSP |
+| **Neutral (4–6)** | Long straddle / strangle | Skip / wait | Iron condor / short strangle |
+| **Bearish (1–3)** | Long put / Bear put spread | Bear put spread | Bear call spread / Covered call |
+
+**Step 2 — Structure modifier** from Event Risk:
+- Event Risk ≥ 7: mandatory defined-risk structure (no naked short legs)
+- Event Risk 5–6: prefer defined-risk; flag if naked leg is considered
+- Event Risk ≤ 4: defined-risk still preferred for retail; naked legs permissible if user has stated comfort
+
+**Step 3 — Width and delta** from Conviction:
+- Conviction ≥ 8: standard width, ATM-adjacent strikes (delta 0.35–0.50)
+- Conviction 6–7: moderate width, slightly OTM (delta 0.25–0.35)
+- Conviction ≤ 5: narrow width, further OTM (delta 0.15–0.25); note the uncertainty explicitly
+
+**Step 4 — Execution check** from Liquidity:
+- Liquidity ≤ 4: warn that fills may be at worse-than-theoretical prices; suggest checking the order book before placing
+- Liquidity ≤ 2: flag explicitly; consider a nearby expiry or strike with better liquidity
+
+#### Terminal Display Format
+
+```
+SIGNAL SCORECARD  |  AAPL  |  2026-06-20
+
+DIRECTIONAL BIAS                                          7 / 10  Bullish
+  For:    Price +2.1% 1-month, near 52-wk high; analyst avg target $210 (+11%);
+          EPS growth +12% YoY
+  Against: One analyst downgrade last week; tariff headwinds cited in supply chain news
+  Confidence: High
+
+IV REGIME                                                 8 / 10  Rich
+  For:    ATM call IV 0.28 vs surface fit 0.22 (iv_excess +0.06)
+          Surface fit r² = 0.87 across 42 contracts — reliable
+  Against: IV is rich vs the surface but not extreme in absolute terms for AAPL
+  Confidence: High
+
+EVENT RISK                                                4 / 10  Low
+  Earnings Jul 31 (71 days) — outside Jun expiry window; Jun expiry is pre-earnings
+  Against: Earnings season proximity may keep sector IV elevated
+  Confidence: High
+
+CONVICTION                                                7 / 10  Aligned
+  Price, analyst, and fundamental signals all bullish; news 80% constructive
+  Against: Supply chain headline is a real risk, not noise
+  Confidence: Medium
+
+LIQUIDITY                                                 8 / 10  Good
+  ATM spread 3.2% of mid  |  OI 8,400 contracts
+  Against: Spreads widen materially after hours — place orders during market hours
+  Confidence: High
+
+COMPOSITE:  Bullish (7) + Rich IV (8)  →  Bull Put Spread
+  Event Risk 4/10: Jun expiry is pre-earnings — no event modifier required
+  Conviction 7/10: Standard width, ATM-adjacent strikes
+  Liquidity 8/10: No execution concern
+
+STRATEGY:   Bull Put Spread
+OUTLOOK:    Bullish (moderate conviction)
+TRADE:      Sell $185 put / Buy $180 put, expiry Jun 20
+MAX PROFIT: $180 per contract  |  MAX LOSS: $320 per contract
+BREAKEVEN:  $183.20
+RATIONALE:  [2-3 sentences]
+
+Why not bull call spread:  IV is rich — buying calls is expensive; selling puts
+  captures the same bullish thesis while collecting elevated premium
+Why not naked CSP:         Defines maximum loss; same premium capture with downside floor
+
+Sensitivity:  If directional bias falls to 5 (neutral), iron condor becomes preferred
+              If earnings move to Jun window (event risk >7), widen wings or shift to Jul expiry
+```
+
+#### Design Principles Behind the Format
+
+**Evidence-first scoring:** By requiring `For:` and `Against:` before the number, Claude cannot produce a convenient score and fill in justification afterward. The evidence is the reasoning; the number is the summary.
+
+**Counterargument per signal:** The `Against:` field prevents confirmation bias. If a bullish directional score has no credible against-case, that is itself a signal the data may be incomplete. Claude should push itself to find the strongest contrary evidence even when the primary signal is clear.
+
+**"Why not X":** Strategy selection is not just choosing the winner — it is eliminating the alternatives. Naming rejected strategies and their reasons gives the user a mental model of the decision space, making it easier to challenge the recommendation in the follow-up chat.
+
+**Sensitivity line:** The recommendation is a point estimate. The sensitivity line tells the user which score is closest to a decision boundary and what would change. This converts a static recommendation into a watch list — the user knows which data point to monitor.
 
 ---
 
@@ -521,7 +842,71 @@ When news mentions an upcoming earnings report, Claude must:
 
 ---
 
-## 10. Extension Guide
+## 10. Textual TUI (v0.9)
+
+### Overview
+
+v0.9 adds `theta_ui.py` — a [Textual](https://textual.textualize.io/) terminal UI that wraps the same `ThetaAgent` used by the CLI. The CLI (`theta.py`) continues to work unchanged. Textual is a Python-native TUI framework; `pip install textual` is the only new dependency.
+
+### Layout
+
+```
+┌─── THETA-AGENT  |  AAPL ───────────────────────────────────────┐
+│ Ticker: [____]  [Research ▶]                                    │
+├──── RESEARCH / SCORECARD (40%) ────┬──── CHAT (60%) ───────────┤
+│                                    │                            │
+│  SIGNAL SCORECARD                  │  Claude: AAPL trading at   │
+│  DIRECTIONAL  7/10 Bullish         │  $189. Bull Put Spread...  │
+│  IV REGIME    8/10 Rich            │                            │
+│  EVENT RISK   4/10 Low             │  You: What if IV spikes?   │
+│  CONVICTION   7/10 Aligned         │                            │
+│  LIQUIDITY    8/10 Good            │  Claude: IV spike would... │
+│                                    │                            │
+│  STRATEGY: Bull Put Spread         │  ─────────────────────     │
+│  TRADE: Sell $185p / Buy $180p     │  > [input bar]        [↵]  │
+└────────────────────────────────────┴────────────────────────────┘
+│ ✓ get_price_data  ✓ get_financials  ⟳ get_options_chain ...     │
+└────────────────────────────────────────────────────────────────┘
+```
+
+### Architecture
+
+**New file:** `theta_ui.py` — `ThetaApp(App)` with three widgets:
+- `ResearchPanel` — `ScrollableContainer` + `RichLog`; receives research output and scorecard
+- `ChatPanel` — scrollable message list + `Input` widget; handles the follow-up REPL
+- `StatusBar` — footer showing live tool call progress and log path
+
+**Agent changes:** `ThetaAgent.__init__()` gains an optional `callbacks: dict | None` parameter. When set, `run_research()` and `chat_loop()` call the hooks instead of `print()`/`input()`:
+
+```python
+callbacks = {
+    "on_tool_call":      fn(name: str, preview: str),   # tool progress → StatusBar
+    "on_research_done":  fn(summary: str),               # Phase 1 complete → ResearchPanel
+    "on_log_path":       fn(path: str),                  # log path → StatusBar
+    "on_chat_reply":     fn(reply: str),                 # chat reply → ChatPanel
+    "on_save_start":     fn(),                           # saving state...
+    "on_save_done":      fn(),                           # state saved
+}
+```
+
+When `callbacks` is `None` (default), all paths fall back to the existing `print()`/`input()` behaviour — the CLI is unaffected.
+
+**Threading:** Textual runs its own event loop on the main thread. The agent's blocking work (API calls, yfinance fetches) runs in Textual worker threads via `@work(thread=True)`. Workers push updates to the UI with `self.app.call_from_thread(...)`. Chat submissions each spawn a short-lived worker; research spawns one worker for the full Phase 1 loop.
+
+**State and position:** Position input is a `TextArea` in the TUI's startup screen (replaces the `input()` prompt in `theta.py`). State load/save logic is identical to the CLI.
+
+### Files added / changed
+
+| File | Change |
+|---|---|
+| `theta_ui.py` | New — `ThetaApp` entry point |
+| `theta/agent.py` | Add `callbacks` param; replace `print`/`input` with callback dispatch |
+| `pyproject.toml` | Add `textual` dependency |
+| `CLAUDE.md` | Update component map and increment plan |
+
+---
+
+## 11. Extension Guide
 
 ### Recipe A — Adding a new native Python tool
 
@@ -614,16 +999,19 @@ When news mentions an upcoming earnings report, Claude must:
 
 ---
 
-## 11. Open Questions
+## 12. Open Questions
 
 These decisions are deliberately deferred. Resolve them at the version where they become necessary.
 
 | Question | Deferred to | What's needed to decide |
 |---|---|---|
-| **Greeks library:** py_vollib_vectorized vs mibian vs manual BSM implementation | v0.3 | Benchmark accuracy and install friction; py_vollib_vectorized is fastest but has C dependencies |
-| **News source quality:** yfinance news is shallow and sometimes stale | v0.7 | Evaluate Brave Search MCP vs NewsAPI vs Benzinga; key criteria are recency, summary quality, and cost at ~50 sessions/day |
+| **Greeks library:** py_vollib_vectorized vs mibian vs manual BSM implementation | v0.3 | Benchmark accuracy and install friction; py_vollib_vectorized is fastest but has C dependencies. **Resolved v0.3:** manual BSM in `tools/options.py` — no C dependencies, sufficient accuracy for retail use |
+| **IV percentile / regime signal:** raw IV is ambiguous without historical context | v0.7 | **Resolved v0.7:** `iv_excess` from OLS surface fit replaces raw IV percentile — cross-sectional signal across the current chain, no historical data required |
+| **News source quality:** yfinance news is shallow and sometimes stale | v0.6 | **Resolved v0.6:** native `search_web` via Brave Search REST API; system prompt instructs Claude to prefer web search over yfinance news |
+| **Earnings awareness:** no structured way to know if an expiry spans an earnings event | v0.7 | **Resolved v0.7:** `get_earnings_dates` + `earnings_count` annotation on each expiry |
 | **Persistence format:** JSON files vs SQLite for saved analyses | v1.0 | JSON files are simpler and git-diffable; SQLite enables queries across sessions — decide based on whether cross-session analysis is a real use case |
 | **Rate limiting strategy:** yfinance has undocumented rate limits | v1.0 | Measure in practice; add exponential backoff + per-session cache before adding a formal rate limiter |
+| **IV surface for multi-expiry chain:** fetching wider chain increases yfinance request count and response size | v0.7 | Monitor token usage in practice; if context is a problem, trim to top 3 contracts per expiry after surface fitting, not before |
 | **Multi-ticker support:** side-by-side comparison or pairs trade suggestion | post-v1.0 | Requires rethinking the single-ticker thesis structure; defer until v1.0 is stable |
 | **Authentication for web deployment:** if exposed as a web app, how do users supply their own API keys? | post-v1.0 | Requires a separate auth model; out of scope for CLI-first design |
-| **Context window management:** long sessions will eventually overflow the context | v0.5 | Implement a sliding window or summarisation step in `chat_loop`; decide max token budget at that point |
+| **Context window management:** long sessions will eventually overflow the context | v1.0 | With multi-expiry options chain, raw tool output is larger; monitor token usage and add sliding window or summarisation if needed |

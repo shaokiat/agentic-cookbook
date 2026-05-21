@@ -4,9 +4,50 @@ All notable changes to theta-agent are documented here.
 
 ## [Unreleased]
 
-### Planned — v0.6
-- Extract tool functions to `tools/` directory
-- Move system prompt to `prompts/system.md`
+### Planned — v0.8
+- `get_ibkr_positions` — read live account positions from IBKR Client Portal Web API; context-aware strategy suggestions against existing holdings
+
+---
+
+## [0.7.0] — Signal Scorecard, IV surface, and earnings calendar
+
+### Added
+- `get_earnings_dates(ticker)` — new tool; 3-tier yfinance fallback (`get_earnings_dates()` → `calendar` → `earnings_dates` property); returns up to 4 future dates with `days_until`; returns empty list gracefully for ETFs and tickers with no earnings data
+- `get_options_chain` extended to multi-expiry: 3 nearest expiries (each ≥ 14 days), strikes ±15% of spot (up from ±10%)
+- OLS IV surface fit across all (strike, expiry) pairs: `iv_fitted` and `iv_excess` (`IV − IV_fitted`) per contract; `IVSurface` model with `r_squared` and `n_points` attached to the chain
+- `earnings_count` per expiry — number of upcoming earnings dates falling within `(today, expiry_date]`; contracts spanning an earnings event are flagged automatically
+- `spread_pct` (bid-ask as % of mid) on each `OptionContract`; `atm_spread_pct` on each `OptionsExpiry`
+- Contracts within each expiry sorted descending by `iv_excess` (richest IV first) to guide credit-spread leg selection
+- Signal Scorecard framework in the system prompt: 5 signals (Directional Bias, IV Regime, Event Risk, Conviction, Liquidity) each with For/Against/Confidence fields and explicit scoring anchors; strategy family selected from Directional × IV Regime matrix; Event Risk, Conviction, and Liquidity modifiers applied in order
+- "Why not [alternative]" and Sensitivity fields added to every strategy recommendation
+- `/scorecard` slash command — re-prints the full 5-signal scorecard from the research phase
+- `/strategy` slash command updated to re-state the full format including "Why not" and Sensitivity
+- Scorecard scores (`directional_bias`, `iv_regime`, `event_risk`, `conviction`, `liquidity`) added to the structured session-extraction JSON record stored in state
+- `max_tokens` raised from 2048 → 4096 to accommodate the richer scorecard output
+- Tool `[tool]` preview in terminal now shows `query` param for `search_web` (previously only `ticker` was shown)
+
+### Models changed
+- New: `EarningsDate`, `EarningsDates`, `IVSurface`, `OptionsExpiry`
+- `OptionsChain` restructured: `expiries: list[OptionsExpiry]` replaces the single-expiry flat structure; top-level `iv_surface` field added; `atm_iv` field removed
+- `OptionContract` extended with `iv_fitted`, `iv_excess`, `spread_pct`
+- `Financials` extended with `short_ratio` (days-to-cover) and `short_pct_of_float`
+
+---
+
+## [0.6.0] — Modular tools and web search
+
+### Added
+- `search_web(query, count?)` — native web search via Brave Search REST API; requires `BRAVE_API_KEY` env var; gracefully returns an error dict if the key is absent rather than crashing
+- `tools/` package: one file per tool, each exporting the function and a `SCHEMA` dict; `tools/__init__.py` assembles the `TOOLS` list and `_DISPATCH` map
+- `prompts/system.md` — system prompt extracted from the Python constant in `theta/prompts.py` to a standalone Markdown file; loaded at startup with `Path.read_text()`; prompt diffs are now legible in git history without touching Python
+- `theta/tools.py` reduced to a two-line shim re-exporting `TOOLS` and `process_tool_call` from the `tools/` package; `theta/agent.py` unchanged
+- `requests>=2.34.2` added as a runtime dependency for `search_web`
+- `load_dotenv()` moved to before tool imports in `theta.py` so env vars are available at module-init time (fixes `BRAVE_API_KEY` not being set when `search_web` is registered)
+- `pyproject.toml` version bumped to 0.6.0; `tools*` added to `packages.find` so the new package is installed correctly
+- `README.md` — user-facing quick-start guide (installation, usage, tool list, slash commands)
+
+### System prompt additions (v0.6)
+- Instruction to prefer `search_web` results over yfinance news when both are available for the same event
 
 ---
 

@@ -4,8 +4,8 @@ A CLI tool that fetches stock research for a given ticker and suggests an option
 
 **Primary reference:** [`docs/OVERVIEW.md`](docs/OVERVIEW.md) — architecture, increment plan, tool catalogue, strategy framework, and extension guide.
 
-**Current version:** v0.5 (implemented)
-**Next:** v0.6 — Extract tool functions to `tools/` directory; move system prompt to `prompts/system.md`
+**Current version:** v0.7 (implemented)
+**Next:** v0.8 — `get_ibkr_positions`: live account positions from IBKR Client Portal Web API
 
 ---
 
@@ -22,6 +22,7 @@ cd theta-agent
 uv venv && uv pip install -e .
 source .venv/bin/activate
 export ANTHROPIC_API_KEY=sk-ant-...
+export BRAVE_API_KEY=...        # optional — enables search_web tool
 python theta.py AAPL
 ```
 
@@ -34,15 +35,23 @@ theta-agent/
 ├── theta.py              ← CLI entry point: loads state, prompts for position, runs agent
 ├── theta/
 │   ├── agent.py          ← ThetaAgent: run_research() + chat_loop(); saves state on exit
-│   ├── tools.py          ← tool functions + TOOLS schemas + process_tool_call() dispatcher
-│   ├── models.py         ← Pydantic models (PriceData, NewsItem, OptionsChain, Financials)
-│   ├── prompts.py        ← SYSTEM_PROMPT constant
+│   ├── tools.py          ← thin shim re-exporting from tools/ package
+│   ├── models.py         ← Pydantic models (PriceData, NewsItem, EarningsDates, OptionsChain, IVSurface, Financials)
+│   ├── prompts.py        ← loads SYSTEM_PROMPT from prompts/system.md
 │   ├── logger.py         ← JSONL session logger (raw API traces → logs/)
 │   └── state.py          ← per-ticker JSON state: load(), save(), prior_context()
+├── tools/                ← one file per tool; __init__.py assembles TOOLS + dispatcher
+│   ├── __init__.py       ← TOOLS list, process_tool_call()
+│   ├── price.py          ← get_price_data + SCHEMA
+│   ├── news.py           ← get_news + SCHEMA
+│   ├── options.py        ← get_options_chain: multi-expiry, OLS IV surface, iv_excess, earnings_count + SCHEMA
+│   ├── financials.py     ← get_financials + SCHEMA
+│   ├── earnings.py       ← get_earnings_dates: 3-tier yfinance fallback + SCHEMA
+│   └── search.py         ← search_web (Brave Search REST API) + SCHEMA
+├── prompts/
+│   └── system.md         ← SYSTEM_PROMPT — edit here without touching Python
 ├── state/                ← auto-created; one JSON file per ticker (position + session history)
-├── logs/                 ← auto-created; one JSONL file per session (raw API traces)
-├── tools/                ← one file per tool from v0.6 (not yet created)
-└── prompts/              ← system.md from v0.6 (not yet created)
+└── logs/                 ← auto-created; one JSONL file per session (raw API traces)
 ```
 
 ## Session flow
@@ -57,26 +66,28 @@ theta-agent/
 | Command | Behaviour |
 |---|---|
 | `/summary` | One-paragraph recap of thesis, key data, and recommended strategy |
-| `/strategy` | Re-states current strategy in full standard format |
+| `/scorecard` | Re-prints the full 5-signal scorecard from the research phase |
+| `/strategy` | Re-states current strategy in full standard format including "Why not" and Sensitivity |
 | `/position` | Re-states the user's declared position and how it interacts with the strategy |
 | `/exit` | Saves state and exits (alias for `exit`, `quit`, `q`) |
 
-## Tools in v0.5
+## Tools in v0.7
 
 | Tool | Returns |
 |---|---|
 | `get_price_data(ticker)` | Current price, 52-wk high/low, P/E, beta, 1-month return, sector via yfinance |
 | `get_news(ticker)` | Up to 10 recent headlines with title, publisher, and summary via yfinance `.news` |
 | `get_financials(ticker)` | Valuation ratios, profitability margins, YoY growth, balance sheet health, free cash flow, analyst consensus via yfinance |
-| `get_options_chain(ticker)` | Top 5 calls + puts by OI within 10% of spot, IV, bid/ask, delta, gamma, theta, vega for expiry ~30 days out |
+| `get_options_chain(ticker)` | 3 nearest expiries (≥14 days), strikes ±15% of spot, BSM greeks, OLS IV surface (`iv_excess`, `r_squared`), `earnings_count` per expiry, sorted by `iv_excess` desc |
+| `get_earnings_dates(ticker)` | Up to 4 upcoming earnings dates with `days_until`; 3-tier yfinance fallback; empty list for ETFs/no-earnings tickers |
+| `search_web(query, count?)` | Web search via Brave Search REST API — requires `BRAVE_API_KEY` |
 
 ## How to add a tool
 
-1. Write the function in `theta/tools.py`
-2. Add its JSON schema to `TOOLS` in the same file
-3. Add a branch to `_DISPATCH` in the same file
-4. Update `SYSTEM_PROMPT` in `theta/prompts.py` if Claude needs guidance on the new data
-5. That's it — the agentic loop picks it up automatically
+1. Create a new file in `tools/` (e.g. `tools/my_tool.py`) with the function and a `SCHEMA` dict
+2. Import and register it in `tools/__init__.py`: add to `TOOLS` and `_DISPATCH`
+3. Update `prompts/system.md` if Claude needs guidance on the new data
+4. That's it — the agentic loop picks it up automatically
 
 ## Increment plan
 
@@ -87,7 +98,8 @@ theta-agent/
 - **[backlog]** — Deep financial analysis: cross-reference valuation, growth, margins, analyst consensus, and options data into a structured comparative breakdown; prompt engineering not started yet
 - **[backlog]** — Prompt/instruction evaluation: verify the system prompt effectively uses richer context (Greeks, financial metrics) as versions accumulate — approaches: LLM-as-judge scoring against a rubric, golden-set regression on saved ticker snapshots, and ablation testing to confirm new context blocks are actually used by Claude
 - **v0.5** — Full conversation memory in chat loop; `/summary`, `/strategy`, `/position` slash commands; position context at startup
-- **v0.6** — Extract tool functions to `tools/` directory; move system prompt to `prompts/system.md`
-- **v0.7** — MCP integration: Brave Search for richer news
+- **v0.6** — `tools/` directory (one file per tool); `prompts/system.md`; native `search_web` tool (Brave Search REST API)
+- **v0.7** — Signal Scorecard framework: `get_earnings_dates` tool; `get_options_chain` extended to multi-expiry + OLS IV surface (`iv_excess`, `r_squared`) + `earnings_count` annotation; 5-signal scorecard (Directional, IV Regime, Event Risk, Conviction, Liquidity) with For/Against/Confidence fields; `/scorecard` slash command; `max_tokens` raised to 4096
 - **v0.8** — Add `get_ibkr_positions`: read live account positions from IBKR Client Portal Web API; context-aware strategy suggestions against existing holdings
+- **v0.9** — Textual TUI: split-pane terminal UI (`theta_ui.py`); left panel = scrollable research + scorecard output; right panel = chat history + input bar; status bar shows live tool call progress; agent callbacks replace `print()`/`input()` so CLI (`theta.py`) continues to work unchanged
 - **v1.0** — Error handling, caching, structured `analyses/` output, polished README
