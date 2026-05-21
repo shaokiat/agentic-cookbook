@@ -5,12 +5,13 @@ import os
 import sys
 
 from dotenv import load_dotenv
+
+load_dotenv()  # Must run before tool imports so env vars are available at module init.
+
 import anthropic
 
 from theta.agent import ThetaAgent
 from theta import state as state_store
-
-load_dotenv()
 
 
 def _prompt_position(ticker: str, stored: str | None) -> str | None:

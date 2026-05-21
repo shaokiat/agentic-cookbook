@@ -1,6 +1,6 @@
 [project]
 name = "theta-agent"
-version = "0.5.0"
+version = "0.6.0"
 description = "CLI options strategy research tool powered by Claude"
 requires-python = ">=3.11"
 dependencies = [
@@ -8,6 +8,7 @@ dependencies = [
     "yfinance",
     "python-dotenv",
     "pydantic>=2.0",
+    "requests>=2.34.2",
 ]
 
 [project.optional-dependencies]
@@ -17,4 +18,4 @@ dev = ["pytest"]
 theta = "theta:main"
 
 [tool.setuptools.packages.find]
-include = ["theta*"]
+include = ["theta*", "tools*"]
