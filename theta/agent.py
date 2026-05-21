@@ -9,7 +9,7 @@ from . import state as state_store
 
 MODEL = "claude-sonnet-4-6"
 
-_SLASH_COMMANDS = "/summary, /strategy, /position, /exit"
+_SLASH_COMMANDS = "/summary, /scorecard, /strategy, /position, /exit"
 
 _EXTRACTION_PROMPT = """\
 Extract a structured session record from this research session. \
@@ -26,7 +26,14 @@ Return ONLY a valid JSON object — no prose, no markdown, no explanation — wi
   "iv_environment": <"low" | "high" | "unknown">,
   "key_themes": <list of 2-3 short strings summarising the main drivers, \
 e.g. ["analyst upgrades", "IV compressed", "earnings beat"]>,
-  "thesis": <one sentence directional argument>
+  "thesis": <one sentence directional argument>,
+  "scorecard": {
+    "directional_bias": <score 1-10 or null>,
+    "iv_regime": <score 1-10 or null>,
+    "event_risk": <score 1-10 or null>,
+    "conviction": <score 1-10 or null>,
+    "liquidity": <score 1-10 or null>
+  }
 }
 
 If a field cannot be determined from the session data, use null."""
@@ -35,9 +42,14 @@ _SUMMARY_PROMPT = (
     "Summarise the research session so far in one paragraph: ticker, current price, "
     "directional thesis, key supporting data points, and the recommended strategy with strikes and expiry."
 )
+_SCORECARD_PROMPT = (
+    "Re-print the full SIGNAL SCORECARD from the research phase exactly as it appeared, "
+    "including all five signals with their For/Against/Confidence fields and the COMPOSITE block."
+)
 _STRATEGY_PROMPT = (
-    "Re-state the current recommended strategy in the standard format:\n"
-    "STRATEGY / OUTLOOK / TRADE / MAX PROFIT / MAX LOSS / BREAKEVEN / RATIONALE"
+    "Re-state the current recommended strategy in the full standard format:\n"
+    "STRATEGY / OUTLOOK / TRADE / MAX PROFIT / MAX LOSS / BREAKEVEN / RATIONALE / "
+    "Why not [alternative] / Why not [alternative] / Sensitivity"
 )
 _POSITION_PROMPT = (
     "Re-state the user's current position in {ticker} as you understand it from this session, "
@@ -83,7 +95,7 @@ class ThetaAgent:
                 logger.api_request(messages)
                 response = self.client.messages.create(
                     model=MODEL,
-                    max_tokens=2048,
+                    max_tokens=4096,
                     system=SYSTEM_PROMPT,
                     tools=TOOLS,
                     messages=messages,
@@ -104,7 +116,8 @@ class ThetaAgent:
                     tool_results = []
                     for block in response.content:
                         if block.type == "tool_use":
-                            print(f"  [tool] {block.name}({block.input.get('ticker', '')})")
+                            preview = block.input.get("ticker") or block.input.get("query", "")
+                            print(f"  [tool] {block.name}({preview})")
                             result_str = process_tool_call(block.name, block.input)
                             logger.tool_call(block.name, block.input, result_str)
                             tool_results.append({
@@ -190,6 +203,8 @@ class ThetaAgent:
             # Slash command: inject a structured prompt instead of the raw user text.
             if user_input == "/summary":
                 prompt = _SUMMARY_PROMPT
+            elif user_input == "/scorecard":
+                prompt = _SCORECARD_PROMPT
             elif user_input == "/strategy":
                 prompt = _STRATEGY_PROMPT
             elif user_input == "/position":

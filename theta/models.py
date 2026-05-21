@@ -29,11 +29,25 @@ class NewsItem(BaseModel):
     error: Optional[str] = None
 
 
+class EarningsDate(BaseModel):
+    date: str
+    days_until: int
+
+
+class EarningsDates(BaseModel):
+    ticker: str
+    earnings_dates: list[EarningsDate] = []
+    error: Optional[str] = None
+
+
 class OptionContract(BaseModel):
     strike: float
     bid: Optional[float] = None
     ask: Optional[float] = None
+    spread_pct: Optional[float] = None   # bid-ask as % of mid; None if no valid mid
     iv: Optional[float] = None
+    iv_fitted: Optional[float] = None
+    iv_excess: Optional[float] = None
     volume: Optional[int] = None
     open_interest: Optional[int] = None
     delta: Optional[float] = None
@@ -42,12 +56,24 @@ class OptionContract(BaseModel):
     vega: Optional[float] = None
 
 
-class OptionsChain(BaseModel):
+class IVSurface(BaseModel):
+    r_squared: float
+    n_points: int
+
+
+class OptionsExpiry(BaseModel):
     expiry: str
-    current_price: float
-    atm_iv: Optional[float] = None
+    dte: int
+    earnings_count: int = 0
+    atm_spread_pct: Optional[float] = None   # avg spread_pct of the 2 nearest ATM contracts (1 call + 1 put)
     calls: list[OptionContract] = []
     puts: list[OptionContract] = []
+
+
+class OptionsChain(BaseModel):
+    current_price: float
+    iv_surface: Optional[IVSurface] = None
+    expiries: list[OptionsExpiry] = []
     error: Optional[str] = None
 
 
@@ -82,4 +108,7 @@ class Financials(BaseModel):
     analyst_target_price: Optional[float] = None
     analyst_recommendation: Optional[str] = None
     analyst_count: Optional[int] = None
+    # Short interest
+    short_ratio: Optional[float] = None          # days-to-cover
+    short_pct_of_float: Optional[float] = None   # short interest as % of float
     error: Optional[str] = None
