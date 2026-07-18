@@ -50,5 +50,5 @@ python examples/01_react_basic.py
 ```
 
 ## 🤖 Agent Examples
-Beyond the concept-ladder examples, this repo also hosts standalone agents built on these patterns — each with its own dependencies and virtualenv:
-- [`theta-agent/`](theta-agent/) — CLI/TUI options-strategy research agent (tool use, session memory, agentic research loop) powered by Claude.
+Beyond the concept-ladder examples, `agents/` hosts standalone agents built on these patterns — each a self-contained project with its own dependencies and virtualenv:
+- [`agents/theta-agent/`](agents/theta-agent/) — CLI/TUI options-strategy research agent (tool use, session memory, agentic research loop) powered by Claude.

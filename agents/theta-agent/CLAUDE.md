@@ -17,10 +17,10 @@ A CLI tool that fetches stock research for a given ticker and suggests an option
 
 ## How to run
 
-theta-agent is a subdirectory of the `agentic-cookbook` monorepo, with its own `pyproject.toml` and virtualenv (independent of the root project's).
+theta-agent lives at `agents/theta-agent/` in the `agentic-cookbook` monorepo, with its own `pyproject.toml` and virtualenv (independent of the root project's).
 
 ```bash
-cd theta-agent
+cd agents/theta-agent
 uv venv && uv pip install -e .
 source .venv/bin/activate
 export ANTHROPIC_API_KEY=sk-ant-...
