@@ -14,9 +14,11 @@ Give it a ticker; it fetches price data, news, financials, and the options chain
 
 ## Quickstart
 
+theta-agent lives inside the [agentic-cookbook](../) monorepo as a standalone example, with its own dependencies and virtualenv.
+
 ```bash
-git clone https://github.com/shaokiat/theta-agent.git
-cd theta-agent
+git clone https://github.com/shaokiat/agentic-cookbook.git
+cd agentic-cookbook/theta-agent
 uv venv && uv pip install -e .
 source .venv/bin/activate
 cp .env.example .env  # add your ANTHROPIC_API_KEY
