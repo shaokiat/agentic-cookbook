@@ -1,4 +1,5 @@
 import json
+from collections.abc import Callable
 
 import anthropic
 
@@ -10,6 +11,9 @@ from . import state as state_store
 MODEL = "claude-sonnet-4-6"
 
 _SLASH_COMMANDS = "/summary, /scorecard, /strategy, /position, /exit"
+
+OutputCallback = Callable[[str], None]
+ToolCallback = Callable[[str, str], None]  # (tool_name, preview)
 
 _EXTRACTION_PROMPT = """\
 Extract a structured session record from this research session. \
@@ -66,15 +70,21 @@ class ThetaAgent:
         client: anthropic.Anthropic,
         positions: str | None = None,
         prior_context: str | None = None,
+        on_output: OutputCallback | None = None,
+        on_tool_call: ToolCallback | None = None,
+        on_status: OutputCallback | None = None,
     ):
         self.ticker = ticker.upper()
         self.client = client
         self.positions = positions
-        self.prior_context = prior_context  # compact summary of past sessions from state file
+        self.prior_context = prior_context
+        self._on_output: OutputCallback = on_output or print
+        self._on_tool_call: ToolCallback = on_tool_call or (lambda name, preview: print(f"  [tool] {name}({preview})"))
+        self._on_status: OutputCallback = on_status or print
 
     def run_research(self) -> tuple[str, list]:
         """Run the agentic tool-use loop; return (summary, full_messages)."""
-        print(f"\nResearching {self.ticker}...\n")
+        self._on_status(f"Researching {self.ticker}...")
         logger = SessionLogger(self.ticker)
 
         initial_content = f"Research {self.ticker} and suggest one options strategy."
@@ -117,7 +127,7 @@ class ThetaAgent:
                     for block in response.content:
                         if block.type == "tool_use":
                             preview = block.input.get("ticker") or block.input.get("query", "")
-                            print(f"  [tool] {block.name}({preview})")
+                            self._on_tool_call(block.name, preview)
                             result_str = process_tool_call(block.name, block.input)
                             logger.tool_call(block.name, block.input, result_str)
                             tool_results.append({
@@ -131,16 +141,16 @@ class ThetaAgent:
                     break
         finally:
             logger.session_end()
-            print(f"\n  [log] {logger.path}")
+            self._on_status(f"[log] {logger.path}")
 
         return summary, messages
 
     def _save_session(self, messages: list) -> None:
         """Extract a structured record from the session and persist it."""
-        print("  [state] extracting session record...")
+        self._on_status("Saving session...")
         record = self._extract_session_record(messages)
         state_store.save(self.ticker, self.positions, record)
-        print(f"  [state] state/{self.ticker}.json updated")
+        self._on_status(f"state/{self.ticker}.json updated")
 
     def _extract_session_record(self, messages: list) -> dict:
         """
@@ -171,17 +181,43 @@ class ThetaAgent:
         except Exception:
             return {}
 
-    def chat_loop(self, initial_summary: str, research_messages: list) -> None:
-        """Run an interactive REPL for follow-up questions using full session context."""
-        print("\n" + "=" * 60)
-        print(f"  THETA-AGENT  |  {self.ticker}")
-        print("=" * 60)
-        print(initial_summary)
-        print("\n" + "-" * 60)
-        print(f"Commands: {_SLASH_COMMANDS}  |  or ask any follow-up question.")
-        print("-" * 60)
+    def send_message(self, user_input: str, messages: list) -> str:
+        """Send one chat turn; mutates messages in place and returns Claude's reply."""
+        if user_input == "/summary":
+            prompt = _SUMMARY_PROMPT
+        elif user_input == "/scorecard":
+            prompt = _SCORECARD_PROMPT
+        elif user_input == "/strategy":
+            prompt = _STRATEGY_PROMPT
+        elif user_input == "/position":
+            prompt = _POSITION_PROMPT.format(ticker=self.ticker)
+        else:
+            prompt = user_input
 
-        # Carry the full research history (including raw tool results) into the chat loop.
+        messages.append({"role": "user", "content": prompt})
+        response = self.client.messages.create(
+            model=MODEL,
+            max_tokens=1024,
+            system=SYSTEM_PROMPT,
+            messages=messages,
+        )
+        reply = next(
+            (block.text for block in response.content if hasattr(block, "text")),
+            "",
+        )
+        messages.append({"role": "assistant", "content": reply})
+        return reply
+
+    def chat_loop(self, initial_summary: str, research_messages: list) -> None:
+        """CLI REPL for follow-up questions. TUI replaces this with send_message()."""
+        self._on_output("\n" + "=" * 60)
+        self._on_output(f"  THETA-AGENT  |  {self.ticker}")
+        self._on_output("=" * 60)
+        self._on_output(initial_summary)
+        self._on_output("\n" + "-" * 60)
+        self._on_output(f"Commands: {_SLASH_COMMANDS}  |  or ask any follow-up question.")
+        self._on_output("-" * 60)
+
         messages = list(research_messages)
 
         while True:
@@ -189,7 +225,7 @@ class ThetaAgent:
                 user_input = input("\nYou: ").strip()
             except (EOFError, KeyboardInterrupt):
                 self._save_session(messages)
-                print("Goodbye!")
+                self._on_output("Goodbye!")
                 break
 
             if not user_input:
@@ -197,32 +233,8 @@ class ThetaAgent:
 
             if user_input.lower() in ("exit", "quit", "q", "/exit"):
                 self._save_session(messages)
-                print("Goodbye!")
+                self._on_output("Goodbye!")
                 break
 
-            # Slash command: inject a structured prompt instead of the raw user text.
-            if user_input == "/summary":
-                prompt = _SUMMARY_PROMPT
-            elif user_input == "/scorecard":
-                prompt = _SCORECARD_PROMPT
-            elif user_input == "/strategy":
-                prompt = _STRATEGY_PROMPT
-            elif user_input == "/position":
-                prompt = _POSITION_PROMPT.format(ticker=self.ticker)
-            else:
-                prompt = user_input
-
-            messages.append({"role": "user", "content": prompt})
-            response = self.client.messages.create(
-                model=MODEL,
-                max_tokens=1024,
-                system=SYSTEM_PROMPT,
-                messages=messages,
-            )
-
-            reply = next(
-                (block.text for block in response.content if hasattr(block, "text")),
-                "",
-            )
-            print(f"\nClaude: {reply}")
-            messages.append({"role": "assistant", "content": reply})
+            reply = self.send_message(user_input, messages)
+            self._on_output(f"\nClaude: {reply}")

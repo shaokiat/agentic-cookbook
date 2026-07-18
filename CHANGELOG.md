@@ -4,8 +4,38 @@ All notable changes to theta-agent are documented here.
 
 ## [Unreleased]
 
-### Planned — v0.8
+### Added — Scorecard v2 (post v0.9 refinement)
+- **Directional bias headline** — one-line verdict (`DIRECTIONAL BIAS: Bullish  7 / 10`) printed before the full scorecard so the reader sees the conclusion before the evidence
+- **Event Risk renamed to Event Clarity** — scale inverted: 10 = no near-term catalyst, 1 = earnings imminent inside target expiry; all five signals now read higher = better setup
+- **Signal display order changed** — Directional Bias → Event Clarity → IV Regime → Conviction → Liquidity; matches the reasoning chain so event context is visible before IV numbers
+- **Confidence line removed** — data-quality caveats now appear inline in the `Against:` field only when genuinely low; eliminated 5 lines of noise from every scorecard
+- **RSI-14** added to `get_price_data` — computed via Wilder smoothing from 3 months of daily closes (extended from 1 month); returned as `rsi_14`; RSI > 75 caps bullish Directional score at 8 (overbought warning); RSI < 25 supports bearish/mean-reversion thesis
+- **Skew** added to `get_options_chain` — avg OTM put IV minus avg OTM call IV at ~0.25 delta from the first expiry; returned as `skew` at the chain level; positive = puts richer than calls (elevated downside hedging demand); reported alongside `iv_excess` in IV Regime signal
+- **Short interest promoted** in Conviction — `short_ratio` and `short_pct_of_float` (already returned by `get_financials`) now explicitly named as a sub-signal in Conviction; `short_ratio > 5` or `short_pct_of_float > 0.10` counted as one contra sub-signal for bullish theses
+- **Event Clarity structure modifier** — modifier thresholds inverted to match new scale (≤ 3 = mandatory defined-risk; 4–5 = prefer defined-risk; ≥ 6 = permissive)
+- **CONTEXT.md** — domain context file created capturing canonical terms and resolved design decisions
+- **Test suite updated** — all mock patches updated from `theta.tools.yf` to module-specific paths (`tools.options.yf`, `tools.financials.yf`, etc.); options chain tests updated to v0.7+ multi-expiry structure; new tests for RSI-14 and skew
+
+### Models changed
+- `PriceData` — new field `rsi_14: Optional[float]`
+- `OptionsChain` — new field `skew: Optional[float]`
+
+---
+
+### Planned — backlog
+
+Near-term (low complexity):
+- `/compare <TICKER2>` slash command — mid-session side-by-side directional bias + IV regime for a second ticker; no new tools needed
+- `rsi_52w_avg` in `get_price_data` — extend history to 1 year, compute trailing-52-week average RSI for a relative overbought/oversold baseline
+
+v1.0 production baseline:
+- Response caching — TTL cache at the `process_tool_call` dispatcher level (5-min for options, session for price/financials)
+- `analyses/` structured output — write full session record (scorecard, strategy, tool results) to `analyses/<TICKER>_<DATE>.json` on exit
+- Prompt/instruction evaluation — LLM-as-judge rubric scoring + golden-set regression on `analyses/` snapshots; requires `analyses/` output in place first
+
+Longer-term:
 - `get_ibkr_positions` — read live account positions from IBKR Client Portal Web API; context-aware strategy suggestions against existing holdings
+- Sector/market regime signal — 6th scorecard signal using SPY/sector ETF relative strength; deferred until response caching is in place
 
 ---
 

@@ -145,10 +145,22 @@ theta-agent/
 | v1.0 | Production baseline | Error handling, rate limiting, response caching, `analyses/` JSON output, polished README | none new | Medium-high |
 
 **Backlog (deferred, not scheduled):**
+
+*Near-term / low complexity:*
+- `/compare <TICKER2>` slash command: mid-session side-by-side directional bias and IV regime for a second ticker — no new tools, just a second research pass with the existing tool set; useful for pairs trades and sector rotation
+- Historical RSI context (`rsi_52w_avg`): extend price history fetch to 1 year, compute average RSI over the trailing 52 weeks to provide a relative baseline — RSI 72 is less alarming if the stock routinely trades at 70+; purely additive to `get_price_data`, no new dependency
+
+*v1.0 production baseline:*
+- Response caching: TTL cache at the `process_tool_call` dispatcher level — 5-min TTL for options chain, session-scoped for price/financials; cuts latency and reduces yfinance rate-limit exposure; modular tool layer makes this a clean insertion point
+- `analyses/` structured output: write the full session record (scorecard scores, strategy recommendation, raw tool results) to `analyses/<TICKER>_<DATE>.json` on exit; enables reviewing past sessions, tracking scorecard drift over time, and provides the snapshot dataset needed for golden-set regression testing
+- Prompt/instruction evaluation: verify the system prompt effectively uses richer context (Greeks, financial metrics, RSI, skew, short interest) as versions accumulate — candidate approaches: (1) LLM-as-judge scoring each session output against a rubric (`did it cite RSI?`, `did it mention skew direction?`, `is iv_excess cited in contract selection?`); (2) golden-set regression — a small set of saved `analyses/` snapshots with expected strategy fields, run after each prompt change to detect regressions; (3) ablation — compare outputs with and without a new context block to confirm Claude actually uses it; requires `analyses/` output (above) to be in place first
+
+*Longer-term:*
+- IBKR positions (`get_ibkr_positions`): read live account positions from IBKR Client Portal Web API; context-aware strategy suggestions against existing holdings; medium complexity, dependent on user running CP Gateway locally
+- Sector/market regime signal: fetch SPY or the sector ETF alongside the ticker to compute relative strength — the one identified blind spot that warrants a 6th scorecard signal; deferred until response caching (above) makes the second yfinance fetch cheap
 - SEC filings (`get_sec_filing`): 10-K/10-Q/8-K via EDGAR free API — parsing complexity and token cost outweigh marginal value over yfinance financial metrics
 - MCP integration: Brave Search MCP server as an alternative to the native `search_web` tool; unified tool registry for native + MCP tools; deferred because native search_web already covers the use case
 - Deep financial analysis: structured multi-dimensional analysis using data already retrieved by existing tools — cross-referencing valuation, growth, margins, analyst consensus, and options metrics into a comparative breakdown (e.g. vs sector peers, vs historical ranges); prompt engineering deferred
-- Prompt/instruction evaluation: as each version adds richer context (Greeks, financial metrics, analyst data), evaluate whether the system prompt is using that context effectively — candidate approaches include: (1) LLM-as-judge scoring strategy outputs against a rubric (correct strategy family for IV regime, Greeks cited in rationale, financials used to qualify thesis); (2) golden-set regression — a small set of saved ticker snapshots with expected strategy fields, run after each prompt change to detect regressions; (3) ablation — compare outputs with and without a new context block to confirm Claude actually uses it rather than ignoring it
 
 ---
 
@@ -412,7 +424,7 @@ Step 1: Directional Thesis
     Question: Is the stock trending up, down, or sideways? Is the valuation stretched?
     Output:  Bullish / Bearish / Neutral + conviction level
 
-Step 2: Event Risk Assessment
+Step 2: Event Clarity Assessment
     Inputs:  get_earnings_dates, get_news, search_web
     Question: Is there a known binary event? Which expiries span it?
     Output:  Event timeline + which expiry dates are earnings-exposed
@@ -508,7 +520,7 @@ Stored as `SYSTEM_PROMPT` constant in `theta/prompts.py`. Under 200 words. Cover
 | v0.4 | Instructions for using financial metrics (valuation ratios, margins, growth, analyst consensus) to qualify or challenge the options thesis |
 | v0.5 | `/summary` and `/strategy` slash command definitions and expected output format |
 | v0.6 | Instructions for prioritising web search results over yfinance news when both are available |
-| v0.7 | Signal scorecard format (5 signals, For/Against/Confidence per signal, COMPOSITE block); scoring rubrics with explicit anchor points for each signal; strategy family matrix from Directional × IV Regime; Event Risk / Conviction / Liquidity modifiers; "Why not" and Sensitivity fields in recommendation; `/scorecard` slash command |
+| v0.7 | Signal scorecard format (5 signals, For/Against/Confidence per signal, COMPOSITE block); scoring rubrics with explicit anchor points for each signal; strategy family matrix from Directional × IV Regime; Event Clarity / Conviction / Liquidity modifiers; "Why not" and Sensitivity fields in recommendation; `/scorecard` slash command |
 
 ### Prompt File Migration (v0.6)
 
@@ -605,19 +617,23 @@ Every Phase 1 output begins with a scored signal scorecard before the strategy r
 
 #### The Five Signals
 
+Displayed order: Directional Bias → Event Clarity → IV Regime → Conviction → Liquidity (matches reasoning chain).
+A one-line directional verdict (`DIRECTIONAL BIAS: Bullish  7 / 10`) is printed before the full scorecard.
+
 | Signal | What it measures | Primary inputs | Score anchor |
 |---|---|---|---|
-| **Directional Bias** | Bull / bear / neutral conviction | Price trend, financials, analyst consensus, news | 1=strong bear, 5=neutral, 10=strong bull |
-| **IV Regime** | Whether options are rich or cheap | `iv_excess`, `iv_surface.r_squared`, ATM IV | 1=very cheap, 5=fair value, 10=very rich |
-| **Event Risk** | Proximity and impact of binary events | `earnings_dates`, `earnings_count` on target expiry | 1=no catalyst, 10=earnings in <7 days spanning expiry |
-| **Conviction** | Internal signal agreement | Alignment between price, news, fundamentals, analyst | 1=all signals diverge, 10=all signals aligned |
+| **Directional Bias** | Bull / bear / neutral conviction | Price trend, RSI-14, financials, analyst consensus, news | 1=strong bear, 5=neutral, 10=strong bull |
+| **Event Clarity** | Cleanliness of the expiry window | `earnings_dates`, `earnings_count` on target expiry | 10=no near-term catalyst, 1=earnings in <7 days spanning expiry |
+| **IV Regime** | Whether options are rich or cheap | `iv_excess`, skew (OTM put IV − call IV), `iv_surface.r_squared`, ATM IV | 1=very cheap, 5=fair value, 10=very rich |
+| **Conviction** | Internal signal agreement | Price, RSI, news, fundamentals, analyst consensus, short interest | 1=all signals diverge, 10=all signals aligned |
 | **Liquidity** | Execution quality at target strikes | Bid-ask as % of mid, open interest | 1=illiquid, 10=tight spreads and deep OI |
 
 #### Scoring Anchors
 
 **Directional Bias**
-- 9-10: Price trending strongly, analyst consensus Buy or Strong Buy, positive earnings growth, news broadly constructive — all sub-signals aligned
-- 7-8: Most signals bullish; one neutral or mildly contradictory data point
+Sub-inputs: price trend (return_1mo_pct), RSI-14, financials (growth, valuation), analyst consensus, news sentiment
+- 9-10: Price trending strongly, RSI 50–70 (momentum without overbought), analyst consensus Buy/Strong Buy, positive earnings growth, news broadly constructive — all sub-signals aligned
+- 7-8: Most signals bullish; one neutral or mildly contradictory data point; RSI > 75 caps bullish score at 8
 - 5-6: Genuinely mixed — one bullish, one bearish, or all neutral; no clear edge
 - 3-4: Most signals bearish; one neutral or mildly constructive
 - 1-2: All sub-signals bearish and aligned
@@ -625,23 +641,26 @@ Every Phase 1 output begins with a scored signal scorecard before the strategy r
 **IV Regime**
 - 9-10: `iv_excess ≥ 0.08` AND `r² ≥ 0.70`
 - 7-8: `iv_excess` 0.04–0.08 AND `r² ≥ 0.70`
-- 5-6: `|iv_excess| < 0.04`, OR `r² < 0.70` (unreliable surface)
+- 5-6: `|iv_excess| < 0.04`, OR `r² < 0.70` (note poor surface fit inline in Against field)
 - 3-4: `iv_excess` −0.08 to −0.04
 - 1-2: `iv_excess ≤ −0.08`
+- Skew enrichment: state `skew` (OTM put IV − OTM call IV at ~0.25 delta) alongside `iv_excess`; positive skew = elevated downside hedging demand
 
-**Event Risk**
-- 9-10: Earnings within 7 days AND `earnings_count > 0` on target expiry
-- 7-8: Earnings 8–21 days AND spans the target expiry
+**Event Clarity** (higher = cleaner expiry window; all five signals now read higher = better)
+- 9-10: No upcoming earnings, or next event > 90 days out
+- 7-8: Earnings 45–90 days, does not span target expiry
 - 5-6: Earnings 22–45 days AND spans expiry; OR earnings <21 days but pre-expiry
-- 3-4: Earnings 45–90 days, does not span expiry
-- 1-2: No upcoming earnings, or next event > 90 days out
+- 3-4: Earnings 8–21 days AND spans the target expiry
+- 1-2: Earnings within 7 days AND `earnings_count > 0` on target expiry
 
 **Conviction**
+Sub-signals: price trend, RSI, news sentiment, earnings growth, analyst consensus, short interest
 - 9-10: 4+ directional sub-signals aligned with no contradictions
 - 7-8: 3 sub-signals aligned, 1 neutral or ambiguous
 - 5-6: 2 aligned, 1–2 directly contradictory (genuinely uncertain)
 - 3-4: More sub-signals contra the directional score than supporting it
 - 1-2: Score is driven by a single data point; all others point the other way
+- Short interest: always named explicitly when `short_ratio` or `short_pct_of_float` is available; `short_ratio > 5` or `short_pct_of_float > 0.10` = one contra sub-signal for a bullish thesis
 
 **Liquidity**
 - 9-10: Bid-ask < 2% of mid AND OI > 5,000
@@ -660,10 +679,10 @@ Every Phase 1 output begins with a scored signal scorecard before the strategy r
 | **Neutral (4–6)** | Long straddle / strangle | Skip / wait | Iron condor / short strangle |
 | **Bearish (1–3)** | Long put / Bear put spread | Bear put spread | Bear call spread / Covered call |
 
-**Step 2 — Structure modifier** from Event Risk:
-- Event Risk ≥ 7: mandatory defined-risk structure (no naked short legs)
-- Event Risk 5–6: prefer defined-risk; flag if naked leg is considered
-- Event Risk ≤ 4: defined-risk still preferred for retail; naked legs permissible if user has stated comfort
+**Step 2 — Structure modifier** from Event Clarity (lower score = more event risk = stricter structure):
+- Event Clarity ≤ 3: mandatory defined-risk structure (no naked short legs), flag IV crush risk explicitly
+- Event Clarity 4–5: prefer defined-risk; flag if naked leg is considered
+- Event Clarity ≥ 6: defined-risk still preferred for retail; naked legs permissible if user has stated comfort
 
 **Step 3 — Width and delta** from Conviction:
 - Conviction ≥ 8: standard width, ATM-adjacent strikes (delta 0.35–0.50)
@@ -677,37 +696,35 @@ Every Phase 1 output begins with a scored signal scorecard before the strategy r
 #### Terminal Display Format
 
 ```
+DIRECTIONAL BIAS:  Bullish  7 / 10
+
 SIGNAL SCORECARD  |  AAPL  |  2026-06-20
 
 DIRECTIONAL BIAS                                          7 / 10  Bullish
-  For:    Price +2.1% 1-month, near 52-wk high; analyst avg target $210 (+11%);
-          EPS growth +12% YoY
+  For:    Price +2.1% 1-month, RSI-14 = 58 (momentum, not overbought);
+          analyst avg target $210 (+11%); EPS growth +12% YoY
   Against: One analyst downgrade last week; tariff headwinds cited in supply chain news
-  Confidence: High
+
+EVENT CLARITY                                             8 / 10  Clear
+  Earnings Jul 31 (71 days) — outside Jun expiry window; Jun expiry is pre-earnings
+  Against: Earnings season proximity may keep sector IV elevated in sympathy
 
 IV REGIME                                                 8 / 10  Rich
-  For:    ATM call IV 0.28 vs surface fit 0.22 (iv_excess +0.06)
+  For:    iv_excess +0.06 (ATM call IV 0.28 vs surface fit 0.22); skew +0.04 (puts richer)
           Surface fit r² = 0.87 across 42 contracts — reliable
   Against: IV is rich vs the surface but not extreme in absolute terms for AAPL
-  Confidence: High
-
-EVENT RISK                                                4 / 10  Low
-  Earnings Jul 31 (71 days) — outside Jun expiry window; Jun expiry is pre-earnings
-  Against: Earnings season proximity may keep sector IV elevated
-  Confidence: High
 
 CONVICTION                                                7 / 10  Aligned
-  Price, analyst, and fundamental signals all bullish; news 80% constructive
+  Price, RSI, analyst, and fundamental signals all bullish; news 80% constructive
+  Short interest: short_ratio 1.8 days — no meaningful bearish signal from short sellers
   Against: Supply chain headline is a real risk, not noise
-  Confidence: Medium
 
 LIQUIDITY                                                 8 / 10  Good
   ATM spread 3.2% of mid  |  OI 8,400 contracts
   Against: Spreads widen materially after hours — place orders during market hours
-  Confidence: High
 
 COMPOSITE:  Bullish (7) + Rich IV (8)  →  Bull Put Spread
-  Event Risk 4/10: Jun expiry is pre-earnings — no event modifier required
+  Event Clarity 8/10: Jun expiry is pre-earnings — no event modifier required
   Conviction 7/10: Standard width, ATM-adjacent strikes
   Liquidity 8/10: No execution concern
 

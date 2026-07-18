@@ -1,4 +1,5 @@
 import json
+import os
 from typing import Any
 
 from .price import get_price_data, SCHEMA as PRICE_SCHEMA
@@ -14,7 +15,6 @@ TOOLS: list[dict] = [
     FINANCIALS_SCHEMA,
     OPTIONS_SCHEMA,
     EARNINGS_SCHEMA,
-    SEARCH_SCHEMA,
 ]
 
 _DISPATCH: dict[str, Any] = {
@@ -23,8 +23,11 @@ _DISPATCH: dict[str, Any] = {
     "get_financials": get_financials,
     "get_options_chain": get_options_chain,
     "get_earnings_dates": get_earnings_dates,
-    "search_web": search_web,
 }
+
+if os.environ.get("BRAVE_API_KEY"):
+    TOOLS.append(SEARCH_SCHEMA)
+    _DISPATCH["search_web"] = search_web
 
 
 def process_tool_call(tool_name: str, tool_input: dict[str, Any]) -> str:

@@ -273,9 +273,29 @@ def get_options_chain(ticker: str) -> dict[str, Any]:
                 puts=puts,
             ))
 
+        # Skew: avg OTM put IV minus avg OTM call IV at ~0.25 delta, first expiry
+        skew = None
+        if output_expiries:
+            first = output_expiries[0]
+            otm_put_ivs = [
+                c.iv for c in first.puts
+                if c.delta is not None and -0.30 <= c.delta <= -0.15 and c.iv
+            ]
+            otm_call_ivs = [
+                c.iv for c in first.calls
+                if c.delta is not None and 0.15 <= c.delta <= 0.30 and c.iv
+            ]
+            if otm_put_ivs and otm_call_ivs:
+                skew = round(
+                    sum(otm_put_ivs) / len(otm_put_ivs)
+                    - sum(otm_call_ivs) / len(otm_call_ivs),
+                    4,
+                )
+
         return OptionsChain(
             current_price=round(current_price, 2),
             iv_surface=iv_surface,
+            skew=skew,
             expiries=output_expiries,
         ).model_dump(exclude_none=True)
 

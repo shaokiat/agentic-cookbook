@@ -17,6 +17,7 @@ class PriceData(BaseModel):
     sector: Optional[str] = None
     industry: Optional[str] = None
     return_1mo_pct: Optional[float] = None
+    rsi_14: Optional[float] = None
     error: Optional[str] = None
 
 
@@ -73,6 +74,7 @@ class OptionsExpiry(BaseModel):
 class OptionsChain(BaseModel):
     current_price: float
     iv_surface: Optional[IVSurface] = None
+    skew: Optional[float] = None   # avg OTM put IV minus avg OTM call IV at ~0.25 delta; positive = puts richer
     expiries: list[OptionsExpiry] = []
     error: Optional[str] = None
 

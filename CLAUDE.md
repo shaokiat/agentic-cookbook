@@ -4,8 +4,8 @@ A CLI tool that fetches stock research for a given ticker and suggests an option
 
 **Primary reference:** [`docs/OVERVIEW.md`](docs/OVERVIEW.md) — architecture, increment plan, tool catalogue, strategy framework, and extension guide.
 
-**Current version:** v0.7 (implemented)
-**Next:** v0.8 — `get_ibkr_positions`: live account positions from IBKR Client Portal Web API
+**Current version:** v0.9 (implemented)
+**Next:** v0.8 (backlog) or v1.0 — see increment plan
 
 ---
 
@@ -23,18 +23,26 @@ uv venv && uv pip install -e .
 source .venv/bin/activate
 export ANTHROPIC_API_KEY=sk-ant-...
 export BRAVE_API_KEY=...        # optional — enables search_web tool
+
+# CLI (unchanged)
 python theta.py AAPL
+
+# Textual TUI (v0.9)
+python theta_ui.py AAPL
 ```
 
 At startup, theta-agent loads `state/<TICKER>.json` (if it exists), shows the stored position, and lets the user keep, update, or clear it. On exit the session summary and updated position are written back to that file. Leave the position blank to skip.
+
+The TUI shows the same position prompt as a modal dialog, then runs research in the left panel (40%) and chat in the right panel (60%). A status bar at the bottom shows live tool call progress.
 
 ## Component map
 
 ```
 theta-agent/
 ├── theta.py              ← CLI entry point: loads state, prompts for position, runs agent
+├── theta_ui.py           ← Textual TUI entry point: same agent, split-pane UI (v0.9)
 ├── theta/
-│   ├── agent.py          ← ThetaAgent: run_research() + chat_loop(); saves state on exit
+│   ├── agent.py          ← ThetaAgent: run_research() + send_message() + chat_loop(); on_output/on_tool_call/on_status callbacks
 │   ├── tools.py          ← thin shim re-exporting from tools/ package
 │   ├── models.py         ← Pydantic models (PriceData, NewsItem, EarningsDates, OptionsChain, IVSurface, Financials)
 │   ├── prompts.py        ← loads SYSTEM_PROMPT from prompts/system.md
