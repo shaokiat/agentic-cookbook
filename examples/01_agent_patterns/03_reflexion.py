@@ -1,3 +1,9 @@
+"""
+Reflexion: Generate -> Critique -> Revise via three narrowly-prompted agents.
+
+Docs: examples/01_agent_patterns/03_reflexion.md
+Reference: conceptual pattern only — neither OpenClaw nor Nanobot ships a named Reflexion subsystem (see PROJECT_CONTEXT.md #7)
+"""
 import os
 from dotenv import load_dotenv
 from core.model import ModelProvider
@@ -10,52 +16,54 @@ from rich.panel import Panel
 # Load environment variables
 load_dotenv()
 
-model = ModelProvider()
-registry = ToolRegistry() # Empty registry for these agents
 console = Console()
+
+DEFAULT_TASK = "Write a short poem about the concept of recursive agent loops in AI."
+
+PHASES = [
+    ("Writer", "Initial Attempt", "You are a creative writer. Your goal is to produce a high-quality initial draft."),
+    ("Critic", "Critique", "You are a critical reviewer. Review the provided text for style, tone, and logical clarity."),
+    ("Editor", "Final Revised Output", "You are an expert editor. Revise the original text based on the provided critique."),
+]
+
+
+def _phase_agent(name: str, system_prompt: str, model: str | None) -> Agent:
+    return Agent(
+        model=ModelProvider(model),
+        memory=Memory(),
+        registry=ToolRegistry(),  # Empty registry for these agents
+        system_prompt=system_prompt,
+        name=name,
+        verbose=False,
+    )
+
+
+def reflexion_steps(task: str, model: str | None = None):
+    """Yield (phase_title, text) as each Generate -> Critique -> Revise phase completes."""
+    attempt = _phase_agent(PHASES[0][0], PHASES[0][2], model).run(task)
+    yield PHASES[0][1], attempt
+
+    critique = _phase_agent(PHASES[1][0], PHASES[1][2], model).run(
+        f"Please critique this text:\n\n{attempt}")
+    yield PHASES[1][1], critique
+
+    final_output = _phase_agent(PHASES[2][0], PHASES[2][2], model).run(
+        f"Original Text: {attempt}\n\nCritique: {critique}")
+    yield PHASES[2][1], final_output
+
 
 def reflexion_demo(task: str):
     console.print(Panel(f"[bold blue]Reflexion Agent[/bold blue]\n[dim]Task: {task}[/dim]", expand=False))
-    
-    # Phase 1: Drafting
-    console.print("\n[bold yellow]\u2776 Phase 1: Generating Initial Attempt...[/bold yellow]")
-    writer_agent = Agent(
-        model=model,
-        memory=Memory(),
-        registry=registry,
-        system_prompt="You are a creative writer. Your goal is to produce a high-quality initial draft.",
-        name="Writer",
-        verbose=False
-    )
-    attempt = writer_agent.run(task)
-    console.print(Panel(attempt, title="Initial Attempt"))
-    
-    # Phase 2: Critique
-    console.print("\n[bold magenta]\u2777 Phase 2: Self-Critiquing...[/bold magenta]")
-    critic_agent = Agent(
-        model=model,
-        memory=Memory(),
-        registry=registry,
-        system_prompt="You are a critical reviewer. Review the provided text for style, tone, and logical clarity.",
-        name="Critic",
-        verbose=False
-    )
-    critique = critic_agent.run(f"Please critique this text:\n\n{attempt}")
-    console.print(Panel(critique, title="Critique"))
-    
-    # Phase 3: Revision
-    console.print("\n[bold cyan]\u2778 Phase 3: Revised Output...[/bold cyan]")
-    revision_agent = Agent(
-        model=model,
-        memory=Memory(),
-        registry=registry,
-        system_prompt="You are an expert editor. Revise the original text based on the provided critique.",
-        name="Editor",
-        verbose=False
-    )
-    final_output = revision_agent.run(f"Original Text: {attempt}\n\nCritique: {critique}")
-    console.print(Panel(final_output, title="Final Revised Output", border_style="green"))
+
+    banners = [
+        "\n[bold yellow]\u2776 Phase 1: Generating Initial Attempt...[/bold yellow]",
+        "\n[bold magenta]\u2777 Phase 2: Self-Critiquing...[/bold magenta]",
+        "\n[bold cyan]\u2778 Phase 3: Revised Output...[/bold cyan]",
+    ]
+    for banner, (title, text) in zip(banners, reflexion_steps(task)):
+        console.print(banner)
+        style = "green" if title == "Final Revised Output" else "none"
+        console.print(Panel(text, title=title, border_style=style))
 
 if __name__ == "__main__":
-    task = "Write a short poem about the concept of recursive agent loops in AI."
-    reflexion_demo(task)
+    reflexion_demo(DEFAULT_TASK)

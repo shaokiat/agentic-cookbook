@@ -7,7 +7,8 @@ contrast between unbounded memory (everything accumulates) and windowed memory
 
 Run with SHOW_FULL_CONTEXT=1 to print the raw message list after each step.
 
-Docs: docs/00_primitives/02_context_window.md
+Docs: examples/00_primitives/02_context_window.md
+Reference: OpenClaw research/openclaw/src/agents/compaction.ts, Nanobot research/nanobot/nanobot/agent/autocompact.py
 """
 import os
 from dotenv import load_dotenv
@@ -136,67 +137,66 @@ def summarize(text: str) -> str:
     return " ".join(words[:12]) + "..."
 
 
-def main():
-    print("--- Context Window Primitive ---\n")
+DEFAULT_PROMPT = "Look up the history of Python and the history of LLMs, then summarize both."
 
-    model = ModelProvider()
+SYSTEM_PROMPT = (
+    "You are a research assistant. Use get_history to fetch information, "
+    "then summarize what you learned."
+)
+
+STRATEGIES = ["unbounded", "windowed", "autocompact"]
+
+
+def build_agent(
+    strategy: str = "unbounded",
+    model: str | None = None,
+    window_size: int = 6,
+    threshold: int = 6,
+    keep_recent: int = 3,
+) -> Agent:
+    provider = ModelProvider(model)
     registry = ToolRegistry()
     registry.register(get_history)
     registry.register(summarize)
 
-    system_prompt = (
-        "You are a research assistant. Use get_history to fetch information, "
-        "then summarize what you learned."
+    if strategy == "windowed":
+        memory = WindowedMemory(window_size=window_size)
+    elif strategy == "autocompact":
+        memory = AutoCompactMemory(model=provider, threshold=threshold, keep_recent=keep_recent)
+    else:
+        memory = InstrumentedMemory()
+
+    return Agent(
+        model=provider,
+        memory=memory,
+        registry=registry,
+        system_prompt=SYSTEM_PROMPT,
+        max_steps=8,
+        verbose=False,
     )
+
+
+def main():
+    print("--- Context Window Primitive ---\n")
 
     # --- Run 1: Unbounded memory ---
     print("=== Run 1: Unbounded Memory ===")
-    memory_unbounded = InstrumentedMemory()
-    agent_unbounded = Agent(
-        model=model,
-        memory=memory_unbounded,
-        registry=registry,
-        system_prompt=system_prompt,
-        max_steps=8,
-        verbose=False,
-    )
-    agent_unbounded.run(
-        "Look up the history of Python and the history of LLMs, then summarize both."
-    )
-    print(f"\nFinal context size: {len(memory_unbounded.get_messages())} messages\n")
+    agent_unbounded = build_agent("unbounded")
+    agent_unbounded.run(DEFAULT_PROMPT)
+    print(f"\nFinal context size: {len(agent_unbounded.memory.get_messages())} messages\n")
 
     # --- Run 2: Windowed memory (window=6) ---
     print("=== Run 2: Windowed Memory (window_size=6) ===")
-    memory_windowed = WindowedMemory(window_size=6)
-    agent_windowed = Agent(
-        model=model,
-        memory=memory_windowed,
-        registry=registry,
-        system_prompt=system_prompt,
-        max_steps=8,
-        verbose=False,
-    )
-    agent_windowed.run(
-        "Look up the history of Python and the history of LLMs, then summarize both."
-    )
-    print(f"\nFinal context size: {len(memory_windowed.get_messages())} messages")
+    agent_windowed = build_agent("windowed")
+    agent_windowed.run(DEFAULT_PROMPT)
+    print(f"\nFinal context size: {len(agent_windowed.memory.get_messages())} messages")
     print("(older messages were evicted to stay within the window)")
 
     # --- Run 3: Auto-compact (summarization at threshold) ---
     print("\n=== Run 3: Auto-Compact Memory (threshold=6, keep_recent=3) ===")
-    memory_compact = AutoCompactMemory(model=model, threshold=6, keep_recent=3)
-    agent_compact = Agent(
-        model=model,
-        memory=memory_compact,
-        registry=registry,
-        system_prompt=system_prompt,
-        max_steps=8,
-        verbose=False,
-    )
-    agent_compact.run(
-        "Look up the history of Python and the history of LLMs, then summarize both."
-    )
-    print(f"\nFinal context size: {len(memory_compact.get_messages())} messages")
+    agent_compact = build_agent("autocompact")
+    agent_compact.run(DEFAULT_PROMPT)
+    print(f"\nFinal context size: {len(agent_compact.memory.get_messages())} messages")
     print("(old messages were compressed into a summary instead of dropped)")
 
 

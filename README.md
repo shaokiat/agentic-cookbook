@@ -49,6 +49,13 @@ Check the `examples/` directory for working implementation examples.
 python examples/01_react_basic.py
 ```
 
+### Web UI
+Every example (and mini-researcher) has an interactive demo page with a model picker and per-agent knobs:
+```bash
+streamlit run ui/app.py
+```
+Chat-style pages keep the agent and its memory in the session; demo pages stream the agent's events (tool calls, observations, approvals) as they happen.
+
 ## 🤖 Agent Examples
 Beyond the concept-ladder examples, `agents/` hosts standalone agents built on these patterns — each a self-contained project with its own dependencies and virtualenv:
 - [`agents/theta-agent/`](agents/theta-agent/) — CLI/TUI options-strategy research agent (tool use, session memory, agentic research loop) powered by Claude.

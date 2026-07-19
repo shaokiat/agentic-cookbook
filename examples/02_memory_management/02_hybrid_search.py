@@ -10,6 +10,7 @@ This is the key difference between intermediate memory (inject everything) and
 long-term memory (retrieve what's relevant).
 
 Docs: examples/02_memory_management/02_hybrid_search.md
+Reference: OpenClaw research/openclaw/src/agents/memory-search.ts, Nanobot research/nanobot/nanobot/agent/memory.py
 """
 import os
 import json
@@ -132,7 +133,7 @@ def recall(query: str) -> str:
 
 # --- Session factory ---
 
-def make_agent(session_name: str, system_note: str = "") -> Agent:
+def make_agent(session_name: str, system_note: str = "", model: str | None = None) -> Agent:
     registry = ToolRegistry()
     registry.register(remember)
     registry.register(recall)
@@ -144,7 +145,7 @@ def make_agent(session_name: str, system_note: str = "") -> Agent:
         + system_note
     )
     return Agent(
-        model=ModelProvider(),
+        model=ModelProvider(model),
         memory=Memory(),
         registry=registry,
         system_prompt=system_prompt,
@@ -155,6 +156,7 @@ def make_agent(session_name: str, system_note: str = "") -> Agent:
 # --- Demo ---
 
 def main():
+    global _store
     # Clear state for a clean run
     if STORE_FILE.exists():
         STORE_FILE.unlink()
@@ -186,7 +188,6 @@ def main():
     print("  (No facts injected into system prompt — retrieval on demand)\n")
 
     # Re-instantiate the store to prove it loaded from disk
-    global _store
     _store = HybridMemoryStore()
     print(f"  [HybridStore] Reloaded {len(_store)} entries from disk.\n")
 

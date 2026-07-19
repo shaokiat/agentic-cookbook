@@ -68,7 +68,7 @@ With a 200k token limit and tool outputs averaging 1k tokens, you can fit roughl
 
 ### 1. Auto-snip (sliding window)
 
-Keep only the last N messages, always preserving the system prompt. Already implemented in [`examples/02_memory_management/01_windowed_memory.py`](../02_memory_management/01_windowed_memory.py).
+Keep only the last N messages, always preserving the system prompt. Already implemented as `WindowedMemory` in [`02_context_window.py`](02_context_window.py).
 
 ```python
 class WindowedMemory(Memory):

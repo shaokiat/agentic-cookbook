@@ -69,6 +69,7 @@ mini-researcher/
 ## Increment plan
 
 - **v1 (done)** — Planner, `ThreadPoolExecutor` fan-out, BM25+vector compression, synthesis with abstention guard, cost tracking, per-URL/per-worker error isolation, README/CLAUDE.md.
+- **v1.1 (done)** — Optional `on_event` progress callback (`ResearchPipeline(config, on_event=...)`, threaded through `run_subquery_worker`). Dict events: `planning_done`, `subquery_start`, `searched`, `scraped`, `subquery_done`, `synthesizing`, `done`. Callback failures are swallowed (`_emit`) so the failure-isolation layers are untouched. Consumed by the cookbook's Streamlit UI (`ui/pages/p90_mini_researcher.py`) via a thread-safe queue.
 - **[backlog]** — Second search provider (e.g. Tavily) to prove the abstraction holds without redesign.
 - **[backlog]** — Source curation pass (optional LLM re-rank after compression) — explicitly deferred during the v1 scoping decision, not essential.
 - **[backlog]** — Subtopic/detailed report mode (per-section synthesis + merge) — explicitly out of scope for the minimal port; only add if there's a concrete teaching reason to demonstrate section-parallel synthesis.

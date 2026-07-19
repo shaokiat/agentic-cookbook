@@ -8,14 +8,15 @@ Demonstrates three stop mechanisms and what happens when they interact:
 
 Each scenario runs a separate agent so the behaviours are isolated.
 
-Docs: docs/00_primitives/03_stop_condition.md
+Docs: examples/00_primitives/03_stop_condition.md
+Reference: Nanobot research/nanobot/nanobot/agent/runner.py — max_iterations + stop_reason signals
 """
 import os
 from dotenv import load_dotenv
 from core.model import ModelProvider
 from core.memory import Memory
 from core.registry import ToolRegistry
-from core.agent import Agent
+from core.agent import Agent, AgentEvent
 
 load_dotenv()
 
@@ -39,25 +40,25 @@ def lookup_capital(country: str) -> str:
     return capitals.get(country.lower(), f"Unknown capital for '{country}'")
 
 
-def run_natural_stop():
-    print("=== Scenario 1: Natural Stop ===")
-    print("The model calls one tool then returns a text answer.\n")
-
-    model = ModelProvider()
-    memory = Memory()
+def build_natural_agent(model: str | None = None) -> Agent:
     registry = ToolRegistry()
     registry.register(lookup_capital)
-
-    agent = Agent(
-        model=model,
-        memory=memory,
+    return Agent(
+        model=ModelProvider(model),
+        memory=Memory(),
         registry=registry,
         system_prompt="Answer geography questions using the lookup_capital tool.",
         max_steps=5,
     )
 
+
+def run_natural_stop():
+    print("=== Scenario 1: Natural Stop ===")
+    print("The model calls one tool then returns a text answer.\n")
+
+    agent = build_natural_agent()
     result = agent.run("What is the capital of Japan?")
-    final_messages = memory.get_messages()
+    final_messages = agent.memory.get_messages()
     print(f"\nStopped after {len(final_messages)} messages in context.")
     print(f"Stop reason: natural (no tool calls on final step)\n")
 
@@ -90,61 +91,34 @@ def finish(answer: str) -> str:
 
 
 class TerminalToolAgent(Agent):
-    """Agent that watches for a `finish` tool call and exits immediately."""
+    """Agent that watches for a `finish` tool call and stops the loop immediately."""
 
-    def run(self, user_input: str) -> str:
-        self.memory.add_message("user", user_input)
-        steps = 0
+    def _act(self, tool_calls, step):
+        for tool_call in tool_calls:
+            name = tool_call["function"]["name"]
+            args = tool_call["function"]["arguments"]
 
-        while steps < self.max_steps:
-            steps += 1
-            response = self.model.generate(
-                messages=self.memory.get_messages(),
-                tools=self.registry.get_schemas(),
+            yield AgentEvent("tool_call", tool=name, args=args, step=step)
+            result = str(self.registry.call_tool(name, args))
+            yield AgentEvent("observation", content=result, tool=name, step=step)
+
+            # Terminal tool: a `final` event makes the base loop exit immediately
+            if name == "finish":
+                yield AgentEvent("final", content=result, step=step)
+                return
+
+            self.memory.add_message(
+                "tool", result, tool_call_id=tool_call["id"], name=name
             )
 
-            if response.content:
-                self.memory.add_message("assistant", response.content)
 
-            if response.tool_calls:
-                self.memory.add_message(
-                    "assistant", response.content or "", tool_calls=response.tool_calls
-                )
-                for tool_call in response.tool_calls:
-                    name = tool_call["function"]["name"]
-                    args = tool_call["function"]["arguments"]
-
-                    result = self.registry.call_tool(name, args)
-                    print(f"  Tool: {name}  →  {result}")
-
-                    # Terminal tool: exit immediately with the answer
-                    if name == "finish":
-                        print(f"\nStopped via terminal tool call at step {steps}.")
-                        return result
-
-                    self.memory.add_message(
-                        "tool", str(result), tool_call_id=tool_call["id"], name=name
-                    )
-                continue
-            else:
-                break
-
-        return self.memory.get_messages()[-1]["content"]
-
-
-def run_terminal_tool():
-    print("=== Scenario 2: Terminal Tool Call ===")
-    print("The model must explicitly call finish() to signal completion.\n")
-
-    model = ModelProvider()
-    memory = Memory()
+def build_terminal_agent(model: str | None = None) -> TerminalToolAgent:
     registry = ToolRegistry()
     registry.register(search)
     registry.register(finish)
-
-    agent = TerminalToolAgent(
-        model=model,
-        memory=memory,
+    return TerminalToolAgent(
+        model=ModelProvider(model),
+        memory=Memory(),
         registry=registry,
         system_prompt=(
             "Answer questions by using the search tool to gather facts. "
@@ -154,7 +128,24 @@ def run_terminal_tool():
         verbose=False,
     )
 
-    result = agent.run("What is the population and area of Singapore?")
+
+def run_terminal_tool():
+    print("=== Scenario 2: Terminal Tool Call ===")
+    print("The model must explicitly call finish() to signal completion.\n")
+
+    agent = build_terminal_agent()
+
+    result = ""
+    saw_finish = False
+    for event in agent.run_events("What is the population and area of Singapore?"):
+        if event.kind == "observation":
+            print(f"  Tool: {event.tool}  →  {event.content}")
+            if event.tool == "finish":
+                saw_finish = True
+        elif event.kind == "final":
+            result = event.content
+            if saw_finish:
+                print(f"\nStopped via terminal tool call at step {event.step}.")
     print(f"Final answer: {result}\n")
 
 
@@ -171,28 +162,28 @@ def broken_tool(input: str) -> str:
     raise RuntimeError("Service unavailable. Please try again later.")
 
 
-def run_step_cap():
-    print("=== Scenario 3: Step Cap (Safety Net) ===")
-    print("A broken tool causes the agent to loop. max_steps prevents infinite execution.\n")
-
-    model = ModelProvider()
-    memory = Memory()
+def build_capped_agent(model: str | None = None, max_steps: int = 3) -> Agent:
     registry = ToolRegistry()
     registry.register(broken_tool)
-
-    agent = Agent(
-        model=model,
-        memory=memory,
+    return Agent(
+        model=ModelProvider(model),
+        memory=Memory(),
         registry=registry,
         system_prompt=(
             "You must use the broken_tool to complete your task. "
             "Keep trying even if it fails."
         ),
-        max_steps=3,  # low cap so the demo finishes quickly
+        max_steps=max_steps,  # low cap so the demo finishes quickly
     )
 
+
+def run_step_cap():
+    print("=== Scenario 3: Step Cap (Safety Net) ===")
+    print("A broken tool causes the agent to loop. max_steps prevents infinite execution.\n")
+
+    agent = build_capped_agent()
     result = agent.run("Use broken_tool to process the string 'hello'.")
-    messages = memory.get_messages()
+    messages = agent.memory.get_messages()
     print(f"\nAgent stopped after hitting max_steps=3.")
     print(f"Total messages in context: {len(messages)}")
     print(f"Last message: {result[:120]}")

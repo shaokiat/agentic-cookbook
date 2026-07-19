@@ -127,4 +127,4 @@ The hybrid retrieval pattern in this example is implemented by a community exten
 
 This example is an accurate illustration of *how* long-term retrieval can be layered on top of an agent loop. Core Open Claw relies on `CLAUDE.md` injection (static) for persistent memory; retrieval is left to extensions.
 
-See [`docs/openclaw_memory_architecture.md`](../../docs/openclaw_memory_architecture.md) for the full breakdown of what Open Claw actually implements.
+See [`docs/reference_architectures.md`](../../docs/reference_architectures.md) for the full breakdown of what Open Claw actually implements.

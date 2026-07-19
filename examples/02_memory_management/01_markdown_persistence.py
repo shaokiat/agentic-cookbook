@@ -7,6 +7,7 @@ The agent in Session 2 starts with a completely empty Memory() yet recalls every
 saved in Session 1 — because the facts were persisted to disk, not to the context window.
 
 Docs: examples/02_memory_management/01_markdown_persistence.md
+Reference: OpenClaw research/openclaw/src/agents/system-prompt.ts (CLAUDE.md injection), Nanobot research/nanobot/nanobot/agent/context.py (MEMORY.md/USER.md injection)
 """
 from pathlib import Path
 from dotenv import load_dotenv
@@ -40,7 +41,7 @@ def load_facts() -> str:
 
 # --- Session Factory ---
 
-def make_agent(session_name: str) -> Agent:
+def make_agent(session_name: str, model: str | None = None) -> Agent:
     registry = ToolRegistry()
     registry.register(save_fact)
     registry.register(load_facts)
@@ -57,7 +58,7 @@ def make_agent(session_name: str) -> Agent:
 Use save_fact to remember new information for future sessions."""
 
     return Agent(
-        model=ModelProvider(),
+        model=ModelProvider(model),
         memory=Memory(),
         registry=registry,
         system_prompt=system_prompt,

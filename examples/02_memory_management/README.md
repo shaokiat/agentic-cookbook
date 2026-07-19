@@ -19,7 +19,7 @@ Agents need memory at three different timescales. This section covers persistenc
 
 ## Open Claw reference
 
-For a complete mapping of these patterns to actual Open Claw source files (with concrete before/after examples), see [`docs/openclaw_memory_architecture.md`](../../docs/openclaw_memory_architecture.md).
+For a complete mapping of these patterns to actual Open Claw source files (with concrete before/after examples), see [`docs/reference_architectures.md`](../../docs/reference_architectures.md).
 
 ## Core Concepts
 

@@ -24,7 +24,7 @@ Four tools are registered: `add`, `multiply`, `count_words`, and `summarize_hist
 
 **Key concept**: `ToolRegistry` auto-generates JSON schemas from Python type hints and `:param` docstrings. You write ordinary functions; the framework handles the API contract.
 
-[Walkthrough →](01_tool_use_walkthrough.md)
+[Walkthrough →](01_tool_use.md)
 
 ---
 
@@ -40,7 +40,7 @@ Runs the same research task three times with three different memory strategies, 
 
 **Key concept**: The context window is the agent's only working memory. All memory management strategies — windowing, compaction, retrieval — are just different ways to decide what stays in that window.
 
-[Walkthrough →](02_context_window_walkthrough.md)
+[Walkthrough →](02_context_window.md)
 
 ---
 
@@ -54,7 +54,7 @@ Three separate scenarios, each with a different termination mechanism:
 
 **Key concept**: Agents do not stop themselves by default. The loop must decide when to stop. Getting this wrong leads to either premature termination (useful work abandoned) or infinite loops (runaway cost).
 
-[Walkthrough →](03_stop_condition_walkthrough.md)
+[Walkthrough →](03_stop_condition.md)
 
 ---
 

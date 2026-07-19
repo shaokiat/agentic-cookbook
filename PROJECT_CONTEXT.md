@@ -251,7 +251,7 @@ The project is built around four core components:
 
 ### 1. Agent Loop (`core/agent.py`)
 
-A sequential **Think-Act-Observe** (ReAct) cycle. We use a simple loop rather than a complex state machine to keep the execution flow predictable and debuggable. Corresponds to `AgentLoop` in Nanobot and `pi-embedded-runner.ts` in OpenClaw.
+A sequential **Think-Act-Observe** (ReAct) cycle. We use a simple loop rather than a complex state machine to keep the execution flow predictable and debuggable. The loop is exposed as `run_events()` — a generator yielding typed `AgentEvent`s (tool calls, observations, approval requests) — so any frontend can render it: `run()` is the terminal renderer, and `ui/` renders the same events in Streamlit. Subclasses customize tool execution by overriding the `_act` hook, never the loop itself. Corresponds to `AgentLoop` in Nanobot and `pi-embedded-runner.ts` in OpenClaw.
 
 ### 2. Tool Registry (`core/registry.py`)
 
@@ -301,7 +301,7 @@ Work through the examples in this order. Each directory builds on the previous.
 | Tool registry              | `core/registry.py`                                    | `src/agents/pi-tools.ts`                                                  | `nanobot/agent/tools/registry.py`                                   |
 | System tools               | `tools/system_tools.py`                               | `src/agents/bash-tools.ts`, `src/agents/tools/`                           | `nanobot/agent/tools/` (filesystem, exec, web, spawn…)              |
 | Model abstraction          | `core/model.py` (LiteLLM)                             | `src/agents/provider-transport-stream.ts`                                 | `nanobot/providers/base.py`, `nanobot/providers/factory.py`         |
-| Streaming                  | —                                                     | `src/agents/pi-embedded-subscribe.ts`                                     | `nanobot/agent/hook.py` — `AgentHook.on_stream`                     |
+| Streaming                  | `core/agent.py` — `Agent.run_events` event generator  | `src/agents/pi-embedded-subscribe.ts`                                     | `nanobot/agent/hook.py` — `AgentHook.on_stream`                     |
 | Context governance         | `examples/00_primitives/02_context_window.py`         | `src/agents/compaction.ts`, `src/context-engine/`                         | `nanobot/agent/runner.py` (5-stage pipeline), `nanobot/agent/autocompact.py` |
 | Intermediate memory        | `examples/02_memory_management/01_markdown_persistence.py` | `CLAUDE.md` via `src/agents/system-prompt.ts`                        | `MEMORY.md` / `USER.md` / `SOUL.md` via `nanobot/agent/context.py` |
 | Skills / prompt modules    | —                                                     | `src/agents/skills/` — YAML-fronted markdown                              | `nanobot/skills/` — `SKILL.md` manifests; `nanobot/agent/skills.py` |
@@ -350,7 +350,9 @@ Work through the examples in this order. Each directory builds on the previous.
 - [ ] `examples/04_tool_use_patterns/` — parallel tools, tool policy pipeline, error recovery
 - [ ] `examples/05_evaluation_and_monitoring/` — structured evals, cost tracking
 - [ ] Session persistence and crash recovery
-- [ ] Streaming-first agent loop
+- [x] Streaming-first agent loop (`Agent.run_events` yields typed `AgentEvent`s; `run()` is the terminal renderer)
+- [x] Streamlit UI layer (`ui/` — one demo page per example, chat pages for multi-turn agents, global model picker)
+- [x] mini-researcher progress events (`on_event` callback consumed by the UI via a thread-safe queue)
 
 ---
 
