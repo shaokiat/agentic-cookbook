@@ -70,23 +70,37 @@ def live_panel(label: str):
 
 
 def _about_content(relpath: str | None, mod=None, *, walkthrough_path: str | None = None,
-                    reference_paths: list[str] | None = None) -> None:
+                    reference_paths: list[str] | None = None, blog_label: str | None = None,
+                    blog_url: str | None = None, blog_note: str | None = None) -> None:
     """Body of the 'About' tab: blog pattern link, Docs/Reference citation, GitHub links.
 
     Deliberately avoids dumping the walkthrough .md or source .py inline — that's what made the
-    old expander huge. Everything here is a short link out to GitHub or the blog instead."""
-    pattern = BLOG_ANCHORS.get(relpath)
-    if pattern:
-        name, anchor = pattern
-        st.markdown(f"**Pattern:** {name}  \n[Read on the blog ↗]({BLOG_PATTERNS_URL}#{anchor})")
-        st.divider()
+    old expander huge. Everything here is a short link out to GitHub or the blog instead.
+
+    blog_label/blog_url let a caller override the BLOG_ANCHORS lookup — needed for pages like
+    mini-researcher that have no single relpath to key off of."""
+    shown = False
+
+    if blog_url is None:
+        pattern = BLOG_ANCHORS.get(relpath)
+        if pattern:
+            blog_label, anchor = pattern
+            blog_url = f"{BLOG_PATTERNS_URL}#{anchor}"
+    if blog_url:
+        st.markdown(f"**Pattern:** {blog_label}  \n[Read on the blog ↗]({blog_url})")
+        if blog_note:
+            st.caption(blog_note)
+        shown = True
 
     doc = (mod.__doc__ or "") if mod is not None else ""
     ref_lines = [ln.strip() for ln in doc.splitlines() if ln.strip().startswith("Reference:")]
     if ref_lines:
+        if shown:
+            st.divider()
         for ln in ref_lines:
             _, _, rest = ln.partition(":")
             st.caption(f"**Reference:** {rest.strip()}")
+        shown = True
 
     wp_rel = walkthrough_path or (relpath.replace(".py", ".md") if relpath else None)
     wp = REPO_ROOT / wp_rel if wp_rel else None
@@ -94,26 +108,32 @@ def _about_content(relpath: str | None, mod=None, *, walkthrough_path: str | Non
     sp = REPO_ROOT / relpath if relpath else None
     has_source = sp is not None and sp.exists() and sp.suffix == ".py"
 
-    if has_walkthrough or has_source or reference_paths:
-        st.divider()
-    col_walk, col_src = st.columns(2)
+    links = []
     if has_walkthrough:
-        col_walk.link_button("Walkthrough ↗", f"{GITHUB_BLOB}/{wp_rel}", use_container_width=True)
+        links.append(("Walkthrough ↗", f"{GITHUB_BLOB}/{wp_rel}"))
     if has_source:
-        col_src.link_button("Source ↗", f"{GITHUB_BLOB}/{relpath}", use_container_width=True)
+        links.append(("Source ↗", f"{GITHUB_BLOB}/{relpath}"))
     for p in reference_paths or []:
-        st.link_button(f"{Path(p).name} ↗", f"{GITHUB_BLOB}/{p}", use_container_width=True)
+        links.append((f"{Path(p).name} ↗", f"{GITHUB_BLOB}/{p}"))
+
+    if links:
+        if shown:
+            st.divider()
+        for col, (label, url) in zip(st.columns(len(links)), links):
+            col.link_button(label, url, use_container_width=True)
 
 
 def page_tabs(relpath: str | None, mod=None, *, walkthrough_path: str | None = None,
-              reference_paths: list[str] | None = None):
+              reference_paths: list[str] | None = None, blog_label: str | None = None,
+              blog_url: str | None = None, blog_note: str | None = None):
     """Creates the ['Demo', 'About'] tabs every page uses, rendering the About tab immediately.
 
     Returns the Demo tab context manager — callers put their existing page body inside
     `with tab_demo:`."""
     tab_demo, tab_about = st.tabs(["Demo", "📖 About"])
     with tab_about:
-        _about_content(relpath, mod, walkthrough_path=walkthrough_path, reference_paths=reference_paths)
+        _about_content(relpath, mod, walkthrough_path=walkthrough_path, reference_paths=reference_paths,
+                        blog_label=blog_label, blog_url=blog_url, blog_note=blog_note)
     return tab_demo
 
 

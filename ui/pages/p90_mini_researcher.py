@@ -15,6 +15,10 @@ tab_demo = page_tabs(
     None,
     walkthrough_path="agents/mini-researcher/README.md",
     reference_paths=["agents/mini-researcher/docs/ARCHITECTURE.md"],
+    blog_label="Researcher Agent (fixed pipeline design)",
+    blog_url="https://shaokiat.github.io/shaokiat-blog/docs/genai-agents/use_cases/researcher-agent/",
+    blog_note="Covers why this is a fixed Planner → Workers → Compression → Synthesizer "
+              "pipeline instead of a ReAct loop, and when you'd reach for each shape.",
 )
 
 with tab_demo:
