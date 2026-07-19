@@ -1,6 +1,6 @@
 import streamlit as st
 
-from common import load_example, page_tabs, render_events, selected_model
+from common import cost_metric, load_example, page_tabs, render_events, selected_model, tool_list_expander
 
 st.title("Stop Conditions")
 st.caption("Three ways an agent loop ends: natural stop, terminal tool call, and the max-steps safety cap.")
@@ -19,6 +19,7 @@ with tab_demo:
     with st.container(border=True):
         scenario = st.radio("Scenario", list(SCENARIOS), horizontal=True)
         builder, default_prompt = SCENARIOS[scenario]
+        tool_list_expander(builder(model=selected_model()))
         prompt = st.text_area("Prompt", value=default_prompt, height=80)
         run = st.button("Run", type="primary")
 
@@ -27,3 +28,4 @@ with tab_demo:
         final = render_events(agent.run_events(prompt))
         st.markdown(f"**Final answer:**\n\n{final}")
         st.info(f"Context ended with {len(agent.memory.get_messages())} messages.")
+        cost_metric(agent)

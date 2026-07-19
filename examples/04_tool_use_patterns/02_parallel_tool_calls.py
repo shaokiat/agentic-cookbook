@@ -142,9 +142,10 @@ def build_registry() -> ToolRegistry:
     return registry
 
 
-def _run_sequential(registry: ToolRegistry, prompt: str, model: str | None = None) -> tuple[str, float]:
+def _run_sequential(registry: ToolRegistry, prompt: str, model: str | None = None,
+                     model_provider: ModelProvider | None = None) -> tuple[str, float]:
     agent = Agent(
-        model=ModelProvider(model),
+        model=model_provider or ModelProvider(model),
         memory=Memory(),
         registry=registry,
         system_prompt="You are a helpful assistant. Call all relevant tools to answer.",
@@ -156,9 +157,10 @@ def _run_sequential(registry: ToolRegistry, prompt: str, model: str | None = Non
     return result, time.perf_counter() - t0
 
 
-def build_parallel_agent(registry: ToolRegistry | None = None, model: str | None = None, verbose: bool = True) -> "ParallelAgent":
+def build_parallel_agent(registry: ToolRegistry | None = None, model: str | None = None, verbose: bool = True,
+                          model_provider: ModelProvider | None = None) -> "ParallelAgent":
     return ParallelAgent(
-        model=ModelProvider(model),
+        model=model_provider or ModelProvider(model),
         memory=Memory(),
         registry=registry or build_registry(),
         system_prompt="You are a helpful assistant. Call all relevant tools to answer.",

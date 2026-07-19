@@ -4,7 +4,9 @@ import time
 import pandas as pd
 import streamlit as st
 
-from common import live_panel, load_example, page_tabs, selected_model
+from core.model import ModelProvider
+
+from common import cost_metric, live_panel, load_example, page_tabs, selected_model
 
 st.title("Async Announce")
 st.caption(
@@ -23,9 +25,10 @@ with tab_demo:
 
     if st.button("Run", type="primary"):
         model = selected_model()
+        provider = ModelProvider(model)  # shared across background workers + synthesizer
         announce_queue = queue.Queue()
         for worker_id, task in tasks:
-            mod.spawn_background_worker(worker_id, task, announce_queue, model)
+            mod.spawn_background_worker(worker_id, task, announce_queue, model, provider)
 
         panels = {wid: live_panel(f"{wid} — running…") for wid, _ in tasks}
         ticker = st.empty()
@@ -50,6 +53,7 @@ with tab_demo:
                 f"(parent loop stays free between ticks)")
 
         with st.spinner("Synthesizing…"):
-            summary = mod.run_synthesizer(announcements, model)
+            summary = mod.run_synthesizer(announcements, model_provider=provider)
         st.subheader("Synthesized Result")
         st.markdown(summary)
+        cost_metric(provider)

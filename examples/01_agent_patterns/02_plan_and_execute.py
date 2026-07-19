@@ -26,7 +26,7 @@ def build_registry() -> ToolRegistry:
     return registry
 
 
-def make_plan(goal: str, model: str | None = None) -> str:
+def make_plan(goal: str, model: str | None = None, model_provider: ModelProvider | None = None) -> str:
     planner_prompt = f"""You are a strategy planner.
     Decompose the following goal into a numbered list of steps.
     Do NOT execute the steps yet.
@@ -35,12 +35,13 @@ def make_plan(goal: str, model: str | None = None) -> str:
     planner_memory = Memory([{"role": "system", "content": "You are a strategic planner."}])
     planner_memory.add_message("user", planner_prompt)
 
-    return ModelProvider(model).generate(planner_memory.get_messages()).content
+    provider = model_provider or ModelProvider(model)
+    return provider.generate(planner_memory.get_messages()).content
 
 
-def build_executor(plan: str, model: str | None = None) -> Agent:
+def build_executor(plan: str, model: str | None = None, model_provider: ModelProvider | None = None) -> Agent:
     return Agent(
-        model=ModelProvider(model),
+        model=model_provider or ModelProvider(model),
         memory=Memory(),
         registry=build_registry(),
         system_prompt=f"""You are an executor agent.

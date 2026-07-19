@@ -55,12 +55,13 @@ def spawn_background_worker(
     task: str,
     announce_queue: "queue.Queue[Announcement]",
     model: str | None = None,
+    model_provider: ModelProvider | None = None,
 ) -> threading.Thread:
     """Start a worker agent in a daemon thread; result is posted to the queue on completion."""
     def _run():
         start = time.perf_counter()
         worker = Agent(
-            model=ModelProvider(model),
+            model=model_provider or ModelProvider(model),
             memory=Memory(),
             registry=ToolRegistry(),
             system_prompt="You are a specialist analyst. Answer the question concisely in 3-5 sentences.",
@@ -75,13 +76,14 @@ def spawn_background_worker(
     return thread
 
 
-def run_synthesizer(announcements: list[Announcement], model: str | None = None) -> str:
+def run_synthesizer(announcements: list[Announcement], model: str | None = None,
+                     model_provider: ModelProvider | None = None) -> str:
     """Combine all worker announcements into one analysis."""
     combined = "\n\n".join(
         f"**{ann.worker_id}**:\n{ann.result}" for ann in announcements
     )
     synthesizer = Agent(
-        model=ModelProvider(model),
+        model=model_provider or ModelProvider(model),
         memory=Memory(),
         registry=ToolRegistry(),
         system_prompt="You are a synthesis expert. Combine specialist inputs into a unified analysis.",

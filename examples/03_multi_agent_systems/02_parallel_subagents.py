@@ -34,10 +34,11 @@ DEFAULT_TASKS = [
 ]
 
 
-def run_worker(role: str, task: str, model: str | None = None) -> tuple[str, str]:
+def run_worker(role: str, task: str, model: str | None = None,
+               model_provider: ModelProvider | None = None) -> tuple[str, str]:
     """Run a single worker agent and return (role, result)."""
     worker = Agent(
-        model=ModelProvider(model),
+        model=model_provider or ModelProvider(model),
         memory=Memory(),
         registry=ToolRegistry(),
         system_prompt=f"You are a {role}. Answer the question concisely in 3-5 sentences.",
@@ -47,23 +48,29 @@ def run_worker(role: str, task: str, model: str | None = None) -> tuple[str, str
     return role, worker.run(task)
 
 
-def run_sequential(tasks: list[tuple[str, str]], model: str | None = None) -> tuple[dict[str, str], float]:
+def run_sequential(tasks: list[tuple[str, str]], model: str | None = None,
+                    model_provider: ModelProvider | None = None) -> tuple[dict[str, str], float]:
     """Run workers one after another and measure elapsed time."""
     start = time.perf_counter()
     results = {}
     for role, task in tasks:
-        role_result, result = run_worker(role, task, model)
+        role_result, result = run_worker(role, task, model, model_provider)
         results[role_result] = result
     elapsed = time.perf_counter() - start
     return results, elapsed
 
 
-def run_parallel(tasks: list[tuple[str, str]], model: str | None = None) -> tuple[dict[str, str], float]:
-    """Run workers concurrently and measure elapsed time."""
+def run_parallel(tasks: list[tuple[str, str]], model: str | None = None,
+                  model_provider: ModelProvider | None = None) -> tuple[dict[str, str], float]:
+    """Run workers concurrently and measure elapsed time. model_provider is shared across
+    threads — ModelProvider's usage accounting is lock-protected so this is thread-safe."""
     start = time.perf_counter()
     results = {}
     with ThreadPoolExecutor(max_workers=len(tasks)) as executor:
-        futures = {executor.submit(run_worker, role, task, model): role for role, task in tasks}
+        futures = {
+            executor.submit(run_worker, role, task, model, model_provider): role
+            for role, task in tasks
+        }
         for future in as_completed(futures):
             role, result = future.result()
             results[role] = result
@@ -71,11 +78,12 @@ def run_parallel(tasks: list[tuple[str, str]], model: str | None = None) -> tupl
     return results, elapsed
 
 
-def run_aggregator(results: dict[str, str], model: str | None = None) -> str:
+def run_aggregator(results: dict[str, str], model: str | None = None,
+                    model_provider: ModelProvider | None = None) -> str:
     """Synthesize all worker outputs into one summary."""
     combined = "\n\n".join(f"**{role}**:\n{res}" for role, res in results.items())
     aggregator = Agent(
-        model=ModelProvider(model),
+        model=model_provider or ModelProvider(model),
         memory=Memory(),
         registry=ToolRegistry(),
         system_prompt="You are a synthesis expert. Combine the specialist reports into a unified summary.",

@@ -1,6 +1,6 @@
 import streamlit as st
 
-from common import load_example, page_tabs, selected_model
+from common import cost_metric, load_example, page_tabs, selected_model, tool_list_expander
 
 relpath = "examples/04_tool_use_patterns/01_human_approval.py"
 mod = load_example(relpath)
@@ -41,6 +41,12 @@ def pump(sent=None):
 
 
 with tab_demo:
+    tool_list_expander(
+        P["agent"] or mod.build_agent(model=selected_model()),
+        note="⚠️ tools marked dangerous pause for approval before running.",
+    )
+    if P["agent"] is not None:
+        cost_metric(P["agent"])
     for ev in P["log"]:
         if ev.kind == "user":
             with st.chat_message("user"):

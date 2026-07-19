@@ -2,6 +2,7 @@ import json
 from collections.abc import Callable
 
 import anthropic
+import litellm
 
 from .logger import SessionLogger
 from .prompts import SYSTEM_PROMPT
@@ -81,6 +82,19 @@ class ThetaAgent:
         self._on_output: OutputCallback = on_output or print
         self._on_tool_call: ToolCallback = on_tool_call or (lambda name, preview: print(f"  [tool] {name}({preview})"))
         self._on_status: OutputCallback = on_status or print
+        self.total_cost = 0.0
+
+    def _track_usage(self, response) -> None:
+        """Accumulate cost for one API response using litellm's pricing table."""
+        try:
+            prompt_cost, completion_cost = litellm.cost_per_token(
+                model=MODEL,
+                prompt_tokens=response.usage.input_tokens,
+                completion_tokens=response.usage.output_tokens,
+            )
+            self.total_cost += prompt_cost + completion_cost
+        except Exception:
+            pass  # cost tracking is best-effort — never let a pricing lookup break the agent loop
 
     def run_research(self) -> tuple[str, list]:
         """Run the agentic tool-use loop; return (summary, full_messages)."""
@@ -111,6 +125,7 @@ class ThetaAgent:
                     messages=messages,
                 )
                 logger.api_response(response.stop_reason, response.content)
+                self._track_usage(response)
 
                 if response.stop_reason == "end_turn":
                     messages.append({"role": "assistant", "content": response.content})
@@ -167,6 +182,7 @@ class ThetaAgent:
                 max_tokens=512,
                 messages=extraction_messages,
             )
+            self._track_usage(response)
             raw = next(
                 (block.text for block in response.content if hasattr(block, "text")),
                 "{}",
@@ -201,6 +217,7 @@ class ThetaAgent:
             system=SYSTEM_PROMPT,
             messages=messages,
         )
+        self._track_usage(response)
         reply = next(
             (block.text for block in response.content if hasattr(block, "text")),
             "",

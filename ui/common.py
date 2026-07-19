@@ -146,6 +146,33 @@ def selected_model() -> str:
     return st.session_state.get("model_choice", DEFAULT_MODEL)
 
 
+def tool_list_expander(agent_or_registry, note: str | None = None) -> None:
+    """Expander listing a ToolRegistry's tools (name + auto-generated description).
+    Accepts either an Agent (reads .registry) or a ToolRegistry directly."""
+    registry = getattr(agent_or_registry, "registry", agent_or_registry)
+    schemas = registry.get_schemas()
+    if not schemas:
+        return
+    with st.expander(f"Tools available ({len(schemas)})"):
+        for schema in schemas:
+            fn = schema["function"]
+            st.markdown(f"**`{fn['name']}`** — {fn['description']}")
+        if note:
+            st.caption(note)
+
+
+def cost_metric(*sources) -> None:
+    """Render a 'Cost' metric summed across one or more Agent/ModelProvider objects
+    (each Agent's .model.get_cumulative_usage().cost accumulates across all its calls)."""
+    total = 0.0
+    for src in sources:
+        if src is None:
+            continue
+        provider = getattr(src, "model", src)
+        total += provider.get_cumulative_usage().cost
+    st.metric("Cost", f"${total:.4f}")
+
+
 def render_events(gen) -> str:
     """Drive an Agent.run_events generator, rendering each event inline, fully expanded, separated by step dividers."""
     final = ""
@@ -193,6 +220,8 @@ def chat_page(title: str, caption: str, relpath: str, builder: str = "build_agen
     chat = st.session_state[state_key]
 
     with tab_demo:
+        tool_list_expander(chat["agent"])
+        cost_metric(chat["agent"])
         for role, content in chat["history"]:
             with st.chat_message(role):
                 st.markdown(content)
@@ -216,10 +245,12 @@ def single_run_page(title: str, caption: str, relpath: str, builder: str = "buil
     tab_demo = page_tabs(relpath, mod)
 
     with tab_demo:
+        agent = getattr(mod, builder)(model=selected_model(), **build_kwargs)
+        tool_list_expander(agent)
         prompt = st.text_area("Prompt", value=getattr(mod, default_prompt_attr, ""), height=120)
 
         if st.button("Run", type="primary"):
-            agent = getattr(mod, builder)(model=selected_model(), **build_kwargs)
             final = render_events(agent.run_events(prompt))
             st.success("Run complete")
             st.markdown(f"**Final answer:**\n\n{final}")
+            cost_metric(agent)

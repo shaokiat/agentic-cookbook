@@ -45,8 +45,11 @@ JUDGE_MODEL = os.getenv("JUDGE_MODEL", os.getenv("DEFAULT_MODEL", "openai/gpt-4o
 
 # --- Judge primitives --------------------------------------------------------
 
-def _judge_call(prompt: str) -> str:
-    """Call the judge model with a plain text prompt, return the response string."""
+def _judge_call(prompt: str, model_provider: ModelProvider | None = None) -> str:
+    """Call the judge model with a plain text prompt, return the response string.
+    Pass model_provider to route through ModelProvider (tracks cost) instead of raw litellm."""
+    if model_provider is not None:
+        return model_provider.generate([{"role": "user", "content": prompt}]).content.strip()
     response = litellm.completion(
         model=JUDGE_MODEL,
         messages=[{"role": "user", "content": prompt}],
@@ -63,7 +66,8 @@ class SingleScore:
     justification: str
 
 
-def score_single(question: str, response: str, criterion: str) -> SingleScore:
+def score_single(question: str, response: str, criterion: str,
+                  model_provider: ModelProvider | None = None) -> SingleScore:
     """
     Ask the judge to rate response on a single criterion from 1 (worst) to 5 (best).
     """
@@ -81,7 +85,7 @@ def score_single(question: str, response: str, criterion: str) -> SingleScore:
 Reply with ONLY a JSON object in this exact format:
 {{"score": <integer 1-5>, "justification": "<one sentence>"}}"""
 
-    raw = _judge_call(prompt)
+    raw = _judge_call(prompt, model_provider)
     try:
         data = json.loads(raw)
         return SingleScore(
@@ -102,7 +106,8 @@ class RubricScore:
     overall: int
 
 
-def score_rubric(question: str, response: str, rubric: dict[str, str]) -> RubricScore:
+def score_rubric(question: str, response: str, rubric: dict[str, str],
+                  model_provider: ModelProvider | None = None) -> RubricScore:
     """
     Score a response against a multi-criterion rubric.
     rubric = {criterion_name: criterion_description}
@@ -126,7 +131,7 @@ Reply with ONLY a JSON object matching this schema:
 
 Also include an "overall" key with a single integer 1–5 representing the overall quality."""
 
-    raw = _judge_call(prompt)
+    raw = _judge_call(prompt, model_provider)
     try:
         data = json.loads(raw)
         overall = int(data.pop("overall", 0))
@@ -145,7 +150,8 @@ class PairwiseResult:
     justification: str
 
 
-def compare_responses(question: str, response_a: str, response_b: str) -> PairwiseResult:
+def compare_responses(question: str, response_a: str, response_b: str,
+                       model_provider: ModelProvider | None = None) -> PairwiseResult:
     """
     Ask the judge to pick the better of two responses (A/B test).
     """
@@ -165,7 +171,7 @@ Which response is better overall? Consider accuracy, completeness, and clarity.
 Reply with ONLY a JSON object:
 {{"winner": "A" | "B" | "tie", "justification": "<one sentence>"}}"""
 
-    raw = _judge_call(prompt)
+    raw = _judge_call(prompt, model_provider)
     try:
         data = json.loads(raw)
         return PairwiseResult(winner=data["winner"], justification=data["justification"])
@@ -175,9 +181,10 @@ Reply with ONLY a JSON object:
 
 # --- Demo agent helpers ------------------------------------------------------
 
-def _run_agent(system_prompt: str, question: str, model: str | None = None) -> str:
+def _run_agent(system_prompt: str, question: str, model: str | None = None,
+               model_provider: ModelProvider | None = None) -> str:
     agent = Agent(
-        model=ModelProvider(model),
+        model=model_provider or ModelProvider(model),
         memory=Memory(),
         registry=ToolRegistry(),
         system_prompt=system_prompt,

@@ -1,4 +1,5 @@
 import os
+import threading
 from typing import List, Dict, Any, Optional
 import litellm
 from pydantic import BaseModel, Field
@@ -22,6 +23,7 @@ class ModelProvider:
     def __init__(self, model: Optional[str] = None):
         self.model = model or os.getenv("DEFAULT_MODEL", "openai/gpt-4o")
         self.cumulative_usage = Usage()
+        self._usage_lock = threading.Lock()
 
     def generate(
         self, 
@@ -69,10 +71,11 @@ class ModelProvider:
             cost=cost
         )
         
-        self.cumulative_usage.prompt_tokens += current_usage.prompt_tokens
-        self.cumulative_usage.completion_tokens += current_usage.completion_tokens
-        self.cumulative_usage.total_tokens += current_usage.total_tokens
-        self.cumulative_usage.cost += current_usage.cost
+        with self._usage_lock:
+            self.cumulative_usage.prompt_tokens += current_usage.prompt_tokens
+            self.cumulative_usage.completion_tokens += current_usage.completion_tokens
+            self.cumulative_usage.total_tokens += current_usage.total_tokens
+            self.cumulative_usage.cost += current_usage.cost
 
         return ModelResponse(
             content=content,

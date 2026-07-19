@@ -27,9 +27,10 @@ PHASES = [
 ]
 
 
-def _phase_agent(name: str, system_prompt: str, model: str | None) -> Agent:
+def _phase_agent(name: str, system_prompt: str, model: str | None,
+                  model_provider: ModelProvider | None = None) -> Agent:
     return Agent(
-        model=ModelProvider(model),
+        model=model_provider or ModelProvider(model),
         memory=Memory(),
         registry=ToolRegistry(),  # Empty registry for these agents
         system_prompt=system_prompt,
@@ -38,16 +39,16 @@ def _phase_agent(name: str, system_prompt: str, model: str | None) -> Agent:
     )
 
 
-def reflexion_steps(task: str, model: str | None = None):
+def reflexion_steps(task: str, model: str | None = None, model_provider: ModelProvider | None = None):
     """Yield (phase_title, text) as each Generate -> Critique -> Revise phase completes."""
-    attempt = _phase_agent(PHASES[0][0], PHASES[0][2], model).run(task)
+    attempt = _phase_agent(PHASES[0][0], PHASES[0][2], model, model_provider).run(task)
     yield PHASES[0][1], attempt
 
-    critique = _phase_agent(PHASES[1][0], PHASES[1][2], model).run(
+    critique = _phase_agent(PHASES[1][0], PHASES[1][2], model, model_provider).run(
         f"Please critique this text:\n\n{attempt}")
     yield PHASES[1][1], critique
 
-    final_output = _phase_agent(PHASES[2][0], PHASES[2][2], model).run(
+    final_output = _phase_agent(PHASES[2][0], PHASES[2][2], model, model_provider).run(
         f"Original Text: {attempt}\n\nCritique: {critique}")
     yield PHASES[2][1], final_output
 

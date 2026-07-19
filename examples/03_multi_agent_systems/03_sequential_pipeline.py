@@ -45,9 +45,10 @@ STAGES = [
 ]
 
 
-def make_agent(name: str, system_prompt: str, model: str | None = None) -> Agent:
+def make_agent(name: str, system_prompt: str, model: str | None = None,
+               model_provider: ModelProvider | None = None) -> Agent:
     return Agent(
-        model=ModelProvider(model),
+        model=model_provider or ModelProvider(model),
         memory=Memory(),
         registry=ToolRegistry(),
         system_prompt=system_prompt,
@@ -56,17 +57,17 @@ def make_agent(name: str, system_prompt: str, model: str | None = None) -> Agent
     )
 
 
-def pipeline_steps(topic: str, model: str | None = None):
+def pipeline_steps(topic: str, model: str | None = None, model_provider: ModelProvider | None = None):
     """Yield (stage_title, text) as each pipeline stage completes."""
-    research_notes = make_agent(STAGES[0][0], STAGES[0][2], model).run(
+    research_notes = make_agent(STAGES[0][0], STAGES[0][2], model, model_provider).run(
         f"Research this topic and provide key facts: {topic}")
     yield STAGES[0][1], research_notes
 
-    draft = make_agent(STAGES[1][0], STAGES[1][2], model).run(
+    draft = make_agent(STAGES[1][0], STAGES[1][2], model, model_provider).run(
         f"Write an article based on these research notes:\n\n{research_notes}")
     yield STAGES[1][1], draft
 
-    final_article = make_agent(STAGES[2][0], STAGES[2][2], model).run(
+    final_article = make_agent(STAGES[2][0], STAGES[2][2], model, model_provider).run(
         f"Edit and polish this draft:\n\n{draft}")
     yield STAGES[2][1], final_article
 

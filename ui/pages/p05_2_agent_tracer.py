@@ -1,6 +1,6 @@
 import streamlit as st
 
-from common import load_example, page_tabs, selected_model
+from common import load_example, page_tabs, selected_model, tool_list_expander
 
 st.title("Agent Tracer")
 st.caption(
@@ -13,6 +13,7 @@ mod = load_example(relpath)
 tab_demo = page_tabs(relpath, mod)
 
 with tab_demo:
+    tool_list_expander(mod.build_agent(model=selected_model()))
     prompt = st.text_area("Prompt", value=mod.DEFAULT_PROMPT, height=100)
 
     if st.button("Run traced", type="primary"):
