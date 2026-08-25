@@ -1,0 +1,32 @@
+[
+  {
+    "backend": "mlx-lm",
+    "model": "openai/mlx-community/Qwen3-0.6B-4bit",
+    "hardware": "M-series Mac 16GB",
+    "dtype": "4bit",
+    "max_model_len": 8192,
+    "concurrency": 1,
+    "kind": "single",
+    "requests": 9,
+    "errors": 0,
+    "ttft_ms": {
+      "p50": 92.6002910000534,
+      "p95": 228.53124999983265
+    },
+    "itl_ms": {
+      "p50": 6.018503283467285,
+      "p95": 6.222783133859672
+    },
+    "e2e_ms": {
+      "p50": 858.8092089999009,
+      "p95": 977.5543329997163
+    },
+    "output_tps_per_req": 166.12556186939028,
+    "aggregate_output_tps": 146.16618902377056,
+    "total_output_tokens": 1152,
+    "wall_s": 7.881439666000006,
+    "synthetic": false,
+    "note": "long-prefill TTFT 1270ms, ITL 9.2ms",
+    "server": {}
+  }
+]

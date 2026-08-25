@@ -245,6 +245,20 @@ Manifest-based plugins inject logic at specific lifecycle points: before the sys
 
 ---
 
+### Level 8: Inference and Serving
+
+**26. Serving Engines and Continuous Batching**
+The layer below `core/model.py`. Generation splits into a compute-bound *prefill* phase (which sets TTFT) and a memory-bandwidth-bound *decode* phase (which sets inter-token latency); the KV cache, not the weights, is what caps concurrency. vLLM's PagedAttention makes that cache cheap to allocate, and continuous batching schedules per decode iteration so finished sequences leave the batch and queued ones join — which is why the throughput gap against a serializing server is *invisible at concurrency 1* and only appears under load.
+
+- In this cookbook: `examples/07_inference/` — backend discovery, TTFT/ITL separation, concurrency sweep. Concepts in `docs/inference_serving.md`.
+
+**27. Self-Hosted Deployment**
+Running the weights yourself, locally and in the cloud. Cold start is dominated by weight download rather than process start, which drives every health-check and caching decision. Cost crosses over only at sustained utilisation, which is why scale-to-zero beats an always-on cluster until you have real traffic.
+
+- In this cookbook: `deploy/vllm/` — `vllm-metal` locally on Apple Silicon, Cloud Run (scale-to-zero) then GKE on GCP. Provider agnosticism means no core changes: litellm resolves `hosted_vllm/*` against `HOSTED_VLLM_API_BASE`.
+
+---
+
 ## Architectural Rationale
 
 The project is built around four core components:
@@ -287,8 +301,9 @@ Work through the examples in this order. Each directory builds on the previous.
 | 3    | `examples/03_multi_agent_systems/`       | Orchestrator/worker, message bus, async announce, per-session concurrency |
 | 4    | `examples/04_tool_use_patterns/`         | Parallel tools, tool policy pipeline, error recovery                      |
 | 5    | `examples/05_evaluation_and_monitoring/` | Tracing, structured logging, task-level evaluation                        |
-| 6    | `research/nanobot/`                      | Lightweight Python reference — all concepts integrated, readable core     |
-| 7    | `research/openclaw/`                     | Full production agent — streaming-first, plugin SDK, subagent registry    |
+| 6    | `examples/07_inference/`                 | Serving open models yourself: TTFT vs ITL, continuous batching, the knee  |
+| 7    | `research/nanobot/`                      | Lightweight Python reference — all concepts integrated, readable core     |
+| 8    | `research/openclaw/`                     | Full production agent — streaming-first, plugin SDK, subagent registry    |
 
 ---
 
@@ -318,6 +333,7 @@ Work through the examples in this order. Each directory builds on the previous.
 | Background / cron agents   | —                                                     | `src/agents/cron/`                                                        | `nanobot/cron/` — `CronService`; Dream as cron job                  |
 | Tracing / logging          | `core/logger.py`, `examples/logs/`                    | `src/agents/anthropic-payload-log.ts`, `cache-trace.ts`                   | `loguru` + `AgentHookContext` tool events                           |
 | MCP                        | —                                                     | `src/mcp/` — client + server, stdio + SSE                                 | `nanobot/agent/tools/mcp.py` — stdio, MCP v1.0                      |
+| Inference / serving        | `examples/07_inference/`, `deploy/vllm/`              | —                                                                          | —                                                                    |
 | Plugin system / hooks      | —                                                     | `src/plugin-sdk/`, `src/plugins/`, lifecycle hooks                        | `nanobot/agent/hook.py` — `AgentHook`, `CompositeHook`              |
 
 ---
@@ -352,8 +368,12 @@ Work through the examples in this order. Each directory builds on the previous.
 - [ ] Session persistence and crash recovery
 - [x] Streaming-first agent loop (`Agent.run_events` yields typed `AgentEvent`s; `run()` is the terminal renderer)
 - [x] Streamlit UI layer (`ui/` — one demo page per example, chat pages for multi-turn agents, global model picker)
+- [x] `examples/07_inference/` — backend discovery, TTFT/ITL benchmark, concurrency sweep
+- [x] `deploy/vllm/` — local (vllm-metal) serving, GCP Cloud Run + GKE manifests
+- [x] Real vLLM vs mlx-lm comparison on Metal (`vllm-metal`, Qwen3-0.6B-4bit) — 1.8x throughput at half the p95 latency at the knee
+- [ ] Ollama concurrency sweep (single-stream only so far) and NVIDIA/CUDA numbers
 - [x] mini-researcher progress events (`on_event` callback consumed by the UI via a thread-safe queue)
 
 ---
 
-_Created: 2026-04-12 | Updated: 2026-04-29_
+_Created: 2026-04-12 | Updated: 2026-08-24_

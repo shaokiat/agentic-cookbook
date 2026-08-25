@@ -1,0 +1,182 @@
+[
+  {
+    "backend": "mlx-lm",
+    "model": "openai/mlx-community/Qwen3-0.6B-4bit",
+    "hardware": "M-series Mac 16GB",
+    "dtype": "4bit",
+    "max_model_len": 8192,
+    "concurrency": 1,
+    "kind": "sweep",
+    "requests": 1,
+    "errors": 0,
+    "ttft_ms": {
+      "p50": 89.36433400003807,
+      "p95": 89.36433400003807
+    },
+    "itl_ms": {
+      "p50": 6.036509842516804,
+      "p95": 6.036509842516804
+    },
+    "e2e_ms": {
+      "p50": 856.0010839996721,
+      "p95": 856.0010839996721
+    },
+    "output_tps_per_req": 165.65863820128715,
+    "aggregate_output_tps": 149.51559284105068,
+    "total_output_tokens": 128,
+    "wall_s": 0.8560979999997471,
+    "synthetic": false,
+    "note": "",
+    "server": {}
+  },
+  {
+    "backend": "mlx-lm",
+    "model": "openai/mlx-community/Qwen3-0.6B-4bit",
+    "hardware": "M-series Mac 16GB",
+    "dtype": "4bit",
+    "max_model_len": 8192,
+    "concurrency": 2,
+    "kind": "sweep",
+    "requests": 2,
+    "errors": 0,
+    "ttft_ms": {
+      "p50": 186.4076249999016,
+      "p95": 189.0828750001674
+    },
+    "itl_ms": {
+      "p50": 6.7187398267701,
+      "p95": 6.7196463307059675
+    },
+    "e2e_ms": {
+      "p50": 1039.6875829997043,
+      "p95": 1042.4779589998252
+    },
+    "output_tps_per_req": 148.82739531845226,
+    "aggregate_output_tps": 245.36450194516053,
+    "total_output_tokens": 256,
+    "wall_s": 1.0433457079998334,
+    "synthetic": false,
+    "note": "",
+    "server": {}
+  },
+  {
+    "backend": "mlx-lm",
+    "model": "openai/mlx-community/Qwen3-0.6B-4bit",
+    "hardware": "M-series Mac 16GB",
+    "dtype": "4bit",
+    "max_model_len": 8192,
+    "concurrency": 4,
+    "kind": "sweep",
+    "requests": 4,
+    "errors": 0,
+    "ttft_ms": {
+      "p50": 285.33850000030725,
+      "p95": 286.51341699969635
+    },
+    "itl_ms": {
+      "p50": 9.313264110234712,
+      "p95": 9.3276630551179
+    },
+    "e2e_ms": {
+      "p50": 1466.0628749998068,
+      "p95": 1469.5529579998947
+    },
+    "output_tps_per_req": 107.71093863491774,
+    "aggregate_output_tps": 347.7710389591959,
+    "total_output_tokens": 512,
+    "wall_s": 1.4722329999999602,
+    "synthetic": false,
+    "note": "",
+    "server": {}
+  },
+  {
+    "backend": "mlx-lm",
+    "model": "openai/mlx-community/Qwen3-0.6B-4bit",
+    "hardware": "M-series Mac 16GB",
+    "dtype": "4bit",
+    "max_model_len": 8192,
+    "concurrency": 8,
+    "kind": "sweep",
+    "requests": 8,
+    "errors": 0,
+    "ttft_ms": {
+      "p50": 567.3187500001404,
+      "p95": 571.9392499995593
+    },
+    "itl_ms": {
+      "p50": 15.72104297637932,
+      "p95": 15.828253606297777
+    },
+    "e2e_ms": {
+      "p50": 2566.770916000223,
+      "p95": 2573.940415999914
+    },
+    "output_tps_per_req": 63.673243832095615,
+    "aggregate_output_tps": 396.3094775942445,
+    "total_output_tokens": 1024,
+    "wall_s": 2.5838392919999933,
+    "synthetic": false,
+    "note": "",
+    "server": {}
+  },
+  {
+    "backend": "mlx-lm",
+    "model": "openai/mlx-community/Qwen3-0.6B-4bit",
+    "hardware": "M-series Mac 16GB",
+    "dtype": "4bit",
+    "max_model_len": 8192,
+    "concurrency": 16,
+    "kind": "sweep",
+    "requests": 16,
+    "errors": 0,
+    "ttft_ms": {
+      "p50": 1111.0826250001082,
+      "p95": 1120.8410000003823
+    },
+    "itl_ms": {
+      "p50": 25.152695543306972,
+      "p95": 25.410277881890106
+    },
+    "e2e_ms": {
+      "p50": 4310.037042000204,
+      "p95": 4340.0442080001085
+    },
+    "output_tps_per_req": 40.01000516519034,
+    "aggregate_output_tps": 469.2775577402991,
+    "total_output_tokens": 2048,
+    "wall_s": 4.364154999999755,
+    "synthetic": false,
+    "note": "",
+    "server": {}
+  },
+  {
+    "backend": "mlx-lm",
+    "model": "openai/mlx-community/Qwen3-0.6B-4bit",
+    "hardware": "M-series Mac 16GB",
+    "dtype": "4bit",
+    "max_model_len": 8192,
+    "concurrency": 32,
+    "kind": "sweep",
+    "requests": 32,
+    "errors": 0,
+    "ttft_ms": {
+      "p50": 2267.9801669996777,
+      "p95": 2305.6983749997926
+    },
+    "itl_ms": {
+      "p50": 32.71441797637886,
+      "p95": 33.45356955118204
+    },
+    "e2e_ms": {
+      "p50": 6430.751166999926,
+      "p95": 6555.4142500000125
+    },
+    "output_tps_per_req": 30.757048501374495,
+    "aggregate_output_tps": 620.7778992650553,
+    "total_output_tokens": 4096,
+    "wall_s": 6.598173041999871,
+    "synthetic": false,
+    "note": "",
+    "server": {}
+  }
+]

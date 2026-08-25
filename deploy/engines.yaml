@@ -1,0 +1,46 @@
+# Local serving configuration — the single place to change what gets served and how.
+#
+# Read by the Makefile, by deploy/vllm/local/serve.sh, and by the benchmark harness, all
+# through deploy/engines.py. Override any value for one run without editing the file:
+#
+#   make serve-vllm VLLM_MODEL=mlx-community/Qwen3-4B-4bit
+
+# All engines serve here, one at a time. LOCAL_API_BASE in .env must match.
+local:
+  port: 8000
+  api_key: cookbook-local
+
+vllm:
+  # 0.6B on purpose: small enough to leave headroom for 64 concurrent requests on a 16GB
+  # laptop, which is what makes the scheduler behaviour visible.
+  model: mlx-community/Qwen3-0.6B-4bit
+  max_model_len: 8192
+
+  # The batching knob. Caps how many sequences the scheduler runs at once — set it at or
+  # above your top sweep level, or the curve flattens at this number rather than at the
+  # hardware limit, which is measuring the config and not the engine.
+  max_num_seqs: 64
+
+  # Share of memory for weights + KV cache. Higher means a bigger cache and more room to
+  # batch; too high and the OS starts swapping, which the sweep will read as a knee.
+  gpu_memory_utilization: 0.92
+
+  # Prefill a shared prompt prefix once and reuse it. Set false to measure what it is worth.
+  enable_prefix_caching: true
+
+  # Anything else, passed through verbatim.
+  extra_args: ""
+
+# The control: it serves one request at a time and has no batching knobs to set. That is
+# the point of it, so there is nothing here but the model.
+mlx:
+  model: mlx-community/Qwen3-0.6B-4bit
+
+ollama:
+  model: qwen3:0.6b
+
+  # The whole ballgame, and it must be set BEFORE the server starts. At Ollama's
+  # conservative default it queues past a handful of concurrent requests and the
+  # throughput curve flattens at exactly that number.
+  num_parallel: 32
+  context_length: 8192

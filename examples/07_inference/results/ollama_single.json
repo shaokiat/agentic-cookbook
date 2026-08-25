@@ -1,0 +1,38 @@
+[
+  {
+    "backend": "ollama",
+    "model": "ollama_chat/qwen3:0.6b",
+    "hardware": "M-series Mac 16GB",
+    "dtype": "Q4_K_M (GGUF)",
+    "max_model_len": 8192,
+    "concurrency": 1,
+    "kind": "single",
+    "requests": 9,
+    "errors": 0,
+    "ttft_ms": {
+      "p50": 118.6635839999326,
+      "p95": 245.36824999995588
+    },
+    "itl_ms": {
+      "p50": 9.116426181104385,
+      "p95": 9.816511488189127
+    },
+    "e2e_ms": {
+      "p50": 1276.4497090001896,
+      "p95": 1454.0300419998857
+    },
+    "output_tps_per_req": 108.10970080683263,
+    "aggregate_output_tps": 97.39955517353769,
+    "total_output_tokens": 1152,
+    "wall_s": 11.827569417000632,
+    "synthetic": false,
+    "note": "long-prefill TTFT 6389ms, ITL 24.2ms",
+    "server": {
+      "ollama": "0.13.5",
+      "context_length": 8192,
+      "size_vram": 11146279040,
+      "parameters": "751.63M",
+      "num_parallel*": "32"
+    }
+  }
+]

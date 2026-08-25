@@ -1,0 +1,76 @@
+# vLLM on a GKE GPU node pool.
+# Create the secrets first:
+#   kubectl create secret generic hf-token     --from-literal=token="$HF_TOKEN"
+#   kubectl create secret generic vllm-api-key --from-literal=key="$VLLM_API_KEY"
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vllm
+  labels: {app: vllm}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: vllm}
+  template:
+    metadata:
+      labels: {app: vllm}
+    spec:
+      # Without this the scheduler will place the pod on a CPU node, where it never starts.
+      nodeSelector:
+        cloud.google.com/gke-accelerator: nvidia-l4
+      # Give a spot node time to drain in-flight generations before it disappears.
+      terminationGracePeriodSeconds: 60
+      containers:
+        - name: vllm
+          image: vllm/vllm-openai:latest
+          args:
+            - --model=Qwen/Qwen3-8B
+            - --port=8000
+            - --max-model-len=8192
+            # Headroom below 1.0 leaves room for activations; too high OOMs at peak batch.
+            - --gpu-memory-utilization=0.90
+          ports:
+            - {name: http, containerPort: 8000}
+          env:
+            - name: HUGGING_FACE_HUB_TOKEN
+              valueFrom: {secretKeyRef: {name: hf-token, key: token}}
+            - name: VLLM_API_KEY
+              valueFrom: {secretKeyRef: {name: vllm-api-key, key: key}}
+            - name: HF_HOME
+              value: /models
+          resources:
+            limits:
+              nvidia.com/gpu: 1        # GPUs are not shareable; request must equal limit
+              memory: 32Gi
+              cpu: "8"
+            requests:
+              nvidia.com/gpu: 1
+              memory: 32Gi
+              cpu: "4"
+          volumeMounts:
+            - {name: model-cache, mountPath: /models}
+            - {name: dshm, mountPath: /dev/shm}
+          # Cold start is dominated by weight download, not process start. The startupProbe
+          # absorbs that once; the readinessProbe then stays fast for the pod's whole life.
+          # Using only a readinessProbe with a long initialDelaySeconds makes EVERY restart
+          # slow instead of just the first.
+          startupProbe:
+            httpGet: {path: /health, port: http}
+            periodSeconds: 10
+            failureThreshold: 90       # ~15 minutes to pull weights and load
+          readinessProbe:
+            httpGet: {path: /health, port: http}
+            periodSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet: {path: /health, port: http}
+            periodSeconds: 30
+            failureThreshold: 5
+      volumes:
+        # Swap for a PersistentVolumeClaim (or GCS FUSE) to survive restarts and share
+        # weights across replicas — that is the main cold-start lever.
+        - name: model-cache
+          emptyDir: {}
+        # The default 64MB /dev/shm breaks NCCL under tensor parallelism, confusingly.
+        - name: dshm
+          emptyDir: {medium: Memory, sizeLimit: 8Gi}

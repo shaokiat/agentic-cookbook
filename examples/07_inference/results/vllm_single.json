@@ -1,0 +1,42 @@
+[
+  {
+    "backend": "vllm",
+    "model": "hosted_vllm/Qwen3-0.6B-4bit",
+    "hardware": "M-series Mac 16GB",
+    "dtype": "4bit",
+    "max_model_len": 8192,
+    "concurrency": 1,
+    "kind": "single",
+    "requests": 9,
+    "errors": 0,
+    "ttft_ms": {
+      "p50": 25.91537500029517,
+      "p95": 1236.80987500029
+    },
+    "itl_ms": {
+      "p50": 5.057179133859969,
+      "p95": 5.227020007870718
+    },
+    "e2e_ms": {
+      "p50": 684.4512500001656,
+      "p95": 1842.5492910000685
+    },
+    "output_tps_per_req": 198.38169301177567,
+    "aggregate_output_tps": 158.55071255592068,
+    "total_output_tokens": 1152,
+    "wall_s": 7.265814082000361,
+    "synthetic": false,
+    "note": "long-prefill TTFT 1496ms, ITL 8.1ms",
+    "server": {
+      "max_model_len": 8192,
+      "block_size": "16",
+      "gpu_memory_utilization": "0.92",
+      "enable_prefix_caching": "True",
+      "kv_cache_size_tokens": "92416",
+      "num_gpu_blocks": "5776",
+      "kv_cache_max_concurrency": "11.28125",
+      "cache_dtype": "auto",
+      "max_num_seqs*": "64"
+    }
+  }
+]

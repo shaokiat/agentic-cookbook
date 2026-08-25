@@ -41,7 +41,10 @@ uv pip install -e .
 2. Add your API keys to the `.env` file.
 
 ## 📚 Documentation
-Check out [Architectures Guide](docs/architectures.md) for a deep dive into ReAct, Plan-and-Execute, and Reflexion patterns.
+- [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md) — motivation, the Level 1–8 concept ladder, and the map from each example to its production counterpart.
+- [docs/llm_provider_strategies.md](docs/llm_provider_strategies.md) — who owns the translation layer between your agent and a provider.
+- [docs/inference_serving.md](docs/inference_serving.md) — the layer below that: KV cache, PagedAttention, continuous batching, and why throughput and latency are the same dial.
+- [docs/reference_architectures.md](docs/reference_architectures.md) — how the reference implementations are put together.
 
 ## 🛠️ Usage
 Check the `examples/` directory for working implementation examples.
@@ -55,6 +58,19 @@ Every example (and mini-researcher) has an interactive demo page with a model pi
 streamlit run ui/app.py
 ```
 Chat-style pages keep the agent and its memory in the session; demo pages stream the agent's events (tool calls, observations, approvals) as they happen.
+
+## ⚡ Self-Hosted Inference
+Run an open-weight model yourself and point the whole cookbook at it — no code changes, just env vars:
+```bash
+make serve-vllm      # vllm-metal on Apple Silicon (or serve-mlx / serve-ollama)
+make probe           # which engine is live, and what it has loaded
+```
+```bash
+# .env — one local endpoint; all three engines serve on it, one at a time
+LOCAL_API_BASE=http://localhost:8000/v1
+HOSTED_VLLM_API_BASE=http://localhost:8000/v1   # for the sidebar model picker
+```
+[`deploy/vllm/`](deploy/vllm/) covers local serving and GCP deployment (Cloud Run first, GKE second). [`examples/07_inference/`](examples/07_inference/) measures what you get — TTFT, decode rate, and the concurrency knee where continuous batching stops helping.
 
 ## 🤖 Agent Examples
 Beyond the concept-ladder examples, `agents/` hosts standalone agents built on these patterns — each a self-contained project with its own dependencies and virtualenv:

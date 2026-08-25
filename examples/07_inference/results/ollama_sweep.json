@@ -1,0 +1,218 @@
+[
+  {
+    "backend": "ollama",
+    "model": "ollama_chat/qwen3:0.6b",
+    "hardware": "M-series Mac 16GB",
+    "dtype": "Q4_K_M (GGUF)",
+    "max_model_len": 8192,
+    "concurrency": 1,
+    "kind": "sweep",
+    "requests": 1,
+    "errors": 0,
+    "ttft_ms": {
+      "p50": 81.05591599996842,
+      "p95": 81.05591599996842
+    },
+    "itl_ms": {
+      "p50": 10.86133366141969,
+      "p95": 10.86133366141969
+    },
+    "e2e_ms": {
+      "p50": 1460.4452910002692,
+      "p95": 1460.4452910002692
+    },
+    "output_tps_per_req": 92.06972469247293,
+    "aggregate_output_tps": 87.61867919293222,
+    "total_output_tokens": 128,
+    "wall_s": 1.4608757080000032,
+    "synthetic": false,
+    "note": "",
+    "server": {
+      "ollama": "0.13.5",
+      "context_length": 8192,
+      "size_vram": 11146279040,
+      "parameters": "751.63M",
+      "num_parallel*": "32"
+    }
+  },
+  {
+    "backend": "ollama",
+    "model": "ollama_chat/qwen3:0.6b",
+    "hardware": "M-series Mac 16GB",
+    "dtype": "Q4_K_M (GGUF)",
+    "max_model_len": 8192,
+    "concurrency": 2,
+    "kind": "sweep",
+    "requests": 2,
+    "errors": 0,
+    "ttft_ms": {
+      "p50": 249.7372500001802,
+      "p95": 252.82929200011495
+    },
+    "itl_ms": {
+      "p50": 16.69869619684856,
+      "p95": 16.70330248818902
+    },
+    "e2e_ms": {
+      "p50": 2370.471666999947,
+      "p95": 2374.1487080001207
+    },
+    "output_tps_per_req": 59.87665758849611,
+    "aggregate_output_tps": 107.80100648553208,
+    "total_output_tokens": 256,
+    "wall_s": 2.3747459169999274,
+    "synthetic": false,
+    "note": "",
+    "server": {
+      "ollama": "0.13.5",
+      "context_length": 8192,
+      "size_vram": 11146279040,
+      "parameters": "751.63M",
+      "num_parallel*": "32"
+    }
+  },
+  {
+    "backend": "ollama",
+    "model": "ollama_chat/qwen3:0.6b",
+    "hardware": "M-series Mac 16GB",
+    "dtype": "Q4_K_M (GGUF)",
+    "max_model_len": 8192,
+    "concurrency": 4,
+    "kind": "sweep",
+    "requests": 4,
+    "errors": 0,
+    "ttft_ms": {
+      "p50": 333.052250000037,
+      "p95": 372.350292000192
+    },
+    "itl_ms": {
+      "p50": 27.864578078738912,
+      "p95": 27.895435039370096
+    },
+    "e2e_ms": {
+      "p50": 3871.853665999879,
+      "p95": 3893.198416999894
+    },
+    "output_tps_per_req": 35.93741187474855,
+    "aggregate_output_tps": 131.24913803666257,
+    "total_output_tokens": 512,
+    "wall_s": 3.900978000000123,
+    "synthetic": false,
+    "note": "",
+    "server": {
+      "ollama": "0.13.5",
+      "context_length": 8192,
+      "size_vram": 11146279040,
+      "parameters": "751.63M",
+      "num_parallel*": "32"
+    }
+  },
+  {
+    "backend": "ollama",
+    "model": "ollama_chat/qwen3:0.6b",
+    "hardware": "M-series Mac 16GB",
+    "dtype": "Q4_K_M (GGUF)",
+    "max_model_len": 8192,
+    "concurrency": 8,
+    "kind": "sweep",
+    "requests": 8,
+    "errors": 0,
+    "ttft_ms": {
+      "p50": 548.7272909999774,
+      "p95": 552.0525829997496
+    },
+    "itl_ms": {
+      "p50": 52.287515425199324,
+      "p95": 53.009734574806224
+    },
+    "e2e_ms": {
+      "p50": 7184.880334000354,
+      "p95": 7275.879458000418
+    },
+    "output_tps_per_req": 19.097010949466924,
+    "aggregate_output_tps": 140.72137663441512,
+    "total_output_tokens": 1024,
+    "wall_s": 7.2767906660001245,
+    "synthetic": false,
+    "note": "",
+    "server": {
+      "ollama": "0.13.5",
+      "context_length": 8192,
+      "size_vram": 11146279040,
+      "parameters": "751.63M",
+      "num_parallel*": "32"
+    }
+  },
+  {
+    "backend": "ollama",
+    "model": "ollama_chat/qwen3:0.6b",
+    "hardware": "M-series Mac 16GB",
+    "dtype": "Q4_K_M (GGUF)",
+    "max_model_len": 8192,
+    "concurrency": 16,
+    "kind": "sweep",
+    "requests": 16,
+    "errors": 0,
+    "ttft_ms": {
+      "p50": 826.7559160003657,
+      "p95": 908.0979170003047
+    },
+    "itl_ms": {
+      "p50": 91.55264698425368,
+      "p95": 91.7101873385831
+    },
+    "e2e_ms": {
+      "p50": 12458.751874999962,
+      "p95": 12551.677542000107
+    },
+    "output_tps_per_req": 10.921879588186844,
+    "aggregate_output_tps": 163.0128851142326,
+    "total_output_tokens": 2048,
+    "wall_s": 12.563424042000406,
+    "synthetic": false,
+    "note": "",
+    "server": {
+      "ollama": "0.13.5",
+      "context_length": 8192,
+      "size_vram": 11146279040,
+      "parameters": "751.63M",
+      "num_parallel*": "32"
+    }
+  },
+  {
+    "backend": "ollama",
+    "model": "ollama_chat/qwen3:0.6b",
+    "hardware": "M-series Mac 16GB",
+    "dtype": "Q4_K_M (GGUF)",
+    "max_model_len": 8192,
+    "concurrency": 32,
+    "kind": "sweep",
+    "requests": 32,
+    "errors": 0,
+    "ttft_ms": {
+      "p50": 1782.8457909999997,
+      "p95": 1986.9360420002522
+    },
+    "itl_ms": {
+      "p50": 216.45841108661048,
+      "p95": 218.8499816220464
+    },
+    "e2e_ms": {
+      "p50": 29254.092000000583,
+      "p95": 29515.52037500005
+    },
+    "output_tps_per_req": 4.61883070552713,
+    "aggregate_output_tps": 138.4691257478841,
+    "total_output_tokens": 4096,
+    "wall_s": 29.58060129200021,
+    "synthetic": false,
+    "note": "",
+    "server": {
+      "ollama": "0.13.5",
+      "context_length": 8192,
+      "size_vram": 11146279040,
+      "parameters": "751.63M",
+      "num_parallel*": "32"
+    }
+  }
+]

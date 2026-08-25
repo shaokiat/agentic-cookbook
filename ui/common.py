@@ -1,5 +1,6 @@
 """Shared helpers for the Streamlit UI: example loading, model picker, event rendering."""
 import importlib.util
+import os
 import sys
 from pathlib import Path
 
@@ -40,6 +41,14 @@ MODELS = [
     "openai/gpt-4o-mini",
 ]
 
+# Self-hosted backends only appear once their base URL is configured (see deploy/vllm/).
+# litellm resolves these prefixes against HOSTED_VLLM_API_BASE / OLLAMA_API_BASE, so
+# core/model.py needs no changes to talk to them.
+if os.getenv("HOSTED_VLLM_API_BASE"):
+    MODELS.append(f"hosted_vllm/{os.getenv('VLLM_MODEL', 'local-model')}")
+if os.getenv("OLLAMA_API_BASE"):
+    MODELS.append(f"ollama_chat/{os.getenv('OLLAMA_MODEL', 'qwen3:8b')}")
+
 DEFAULT_MODEL = "anthropic/claude-haiku-4-5"
 
 
@@ -71,15 +80,21 @@ def live_panel(label: str):
 
 def _about_content(relpath: str | None, mod=None, *, walkthrough_path: str | None = None,
                     reference_paths: list[str] | None = None, blog_label: str | None = None,
-                    blog_url: str | None = None, blog_note: str | None = None) -> None:
+                    blog_url: str | None = None, blog_note: str | None = None,
+                    extra=None) -> None:
     """Body of the 'About' tab: blog pattern link, Docs/Reference citation, GitHub links.
 
     Deliberately avoids dumping the walkthrough .md or source .py inline — that's what made the
     old expander huge. Everything here is a short link out to GitHub or the blog instead.
 
     blog_label/blog_url let a caller override the BLOG_ANCHORS lookup — needed for pages like
-    mini-researcher that have no single relpath to key off of."""
+    mini-researcher that have no single relpath to key off of. `extra` is a callable rendering
+    page-specific prose above the links."""
     shown = False
+
+    if extra is not None:
+        extra()
+        shown = True
 
     if blog_url is None:
         pattern = BLOG_ANCHORS.get(relpath)
@@ -125,7 +140,7 @@ def _about_content(relpath: str | None, mod=None, *, walkthrough_path: str | Non
 
 def page_tabs(relpath: str | None, mod=None, *, walkthrough_path: str | None = None,
               reference_paths: list[str] | None = None, blog_label: str | None = None,
-              blog_url: str | None = None, blog_note: str | None = None):
+              blog_url: str | None = None, blog_note: str | None = None, about_extra=None):
     """Creates the ['Demo', 'About'] tabs every page uses, rendering the About tab immediately.
 
     Returns the Demo tab context manager — callers put their existing page body inside
@@ -133,7 +148,8 @@ def page_tabs(relpath: str | None, mod=None, *, walkthrough_path: str | None = N
     tab_demo, tab_about = st.tabs(["Demo", "📖 About"])
     with tab_about:
         _about_content(relpath, mod, walkthrough_path=walkthrough_path, reference_paths=reference_paths,
-                        blog_label=blog_label, blog_url=blog_url, blog_note=blog_note)
+                        blog_label=blog_label, blog_url=blog_url, blog_note=blog_note,
+                        extra=about_extra)
     return tab_demo
 
 

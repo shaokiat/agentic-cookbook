@@ -62,6 +62,11 @@ nav_pages = {
             st.Page("pages/theta_agent.py", title="theta-agent"),
         ],
     },
+    "Inference & Serving": {
+        "Benchmarks": [
+            st.Page("pages/p07_1_inference_bench.py", title="Inference Benchmarks"),
+        ],
+    },
 }
 
 # st.navigation's built-in sidebar menu can't collapse per section — only its
