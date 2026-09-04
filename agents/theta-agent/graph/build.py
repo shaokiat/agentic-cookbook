@@ -4,6 +4,7 @@ import os
 
 from langgraph.graph import END, StateGraph
 
+from .nodes import fetch_iv_context, screen_chain_csp, screen_chain_leaps, tag_thesis
 from .state import (
     DEFAULT_ACCOUNT_SIZE,
     LIQUIDITY_DEFAULTS,
@@ -39,19 +40,19 @@ def route_by_strategy(state: ScreenerState) -> str:
     return state["strategy_type"]
 
 
-def _stub(state: ScreenerState) -> dict:
-    return {}
-
-
 def build_graph(
-    screen_chain_leaps=_stub,
-    screen_chain_csp=_stub,
+    leaps_node=screen_chain_leaps,
+    csp_node=screen_chain_csp,
+    iv_node=fetch_iv_context,
     checkpointer=None,
 ):
+    """Nodes are injectable so routing and wiring can be tested with stubs and no network."""
     g = StateGraph(ScreenerState)
     g.add_node("validate_selection", validate_selection)
-    g.add_node("screen_chain_leaps", screen_chain_leaps)
-    g.add_node("screen_chain_csp", screen_chain_csp)
+    g.add_node("screen_chain_leaps", leaps_node)
+    g.add_node("screen_chain_csp", csp_node)
+    g.add_node("fetch_iv_context", iv_node)
+    g.add_node("tag_thesis", tag_thesis)
 
     g.set_entry_point("validate_selection")
     g.add_conditional_edges(
@@ -59,8 +60,10 @@ def build_graph(
         route_by_strategy,
         {"long_leaps": "screen_chain_leaps", "csp": "screen_chain_csp"},
     )
-    g.add_edge("screen_chain_leaps", END)
-    g.add_edge("screen_chain_csp", END)
+    g.add_edge("screen_chain_leaps", "fetch_iv_context")
+    g.add_edge("screen_chain_csp", "fetch_iv_context")
+    g.add_edge("fetch_iv_context", "tag_thesis")
+    g.add_edge("tag_thesis", END)
     return g.compile(checkpointer=checkpointer)
 
 
