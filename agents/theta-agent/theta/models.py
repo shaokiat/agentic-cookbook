@@ -41,44 +41,6 @@ class EarningsDates(BaseModel):
     error: Optional[str] = None
 
 
-class OptionContract(BaseModel):
-    strike: float
-    bid: Optional[float] = None
-    ask: Optional[float] = None
-    spread_pct: Optional[float] = None   # bid-ask as % of mid; None if no valid mid
-    iv: Optional[float] = None
-    iv_fitted: Optional[float] = None
-    iv_excess: Optional[float] = None
-    volume: Optional[int] = None
-    open_interest: Optional[int] = None
-    delta: Optional[float] = None
-    gamma: Optional[float] = None
-    theta: Optional[float] = None
-    vega: Optional[float] = None
-
-
-class IVSurface(BaseModel):
-    r_squared: float
-    n_points: int
-
-
-class OptionsExpiry(BaseModel):
-    expiry: str
-    dte: int
-    earnings_count: int = 0
-    atm_spread_pct: Optional[float] = None   # avg spread_pct of the 2 nearest ATM contracts (1 call + 1 put)
-    calls: list[OptionContract] = []
-    puts: list[OptionContract] = []
-
-
-class OptionsChain(BaseModel):
-    current_price: float
-    iv_surface: Optional[IVSurface] = None
-    skew: Optional[float] = None   # avg OTM put IV minus avg OTM call IV at ~0.25 delta; positive = puts richer
-    expiries: list[OptionsExpiry] = []
-    error: Optional[str] = None
-
-
 class Financials(BaseModel):
     ticker: str
     # Valuation

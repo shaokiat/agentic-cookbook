@@ -1,75 +1,72 @@
 # theta-agent
 
-A CLI tool that fetches stock research for a given ticker and suggests an options strategy via conversation with Claude.
+A multi-ticker options screener. Pick a watchlist subset and one strategy; get back a ranked,
+thesis-tagged candidate table with a mandatory human approval step before anything is finalised.
 
-Give it a ticker; it fetches price data, news, financials, and the options chain — then invites follow-up questions.
+Two strategies ship:
 
-## Features
+| Strategy | Window | Delta | Favourable IV |
+|---|---|---|---|
+| Long ITM LEAPS | DTE > 500 | 0.70–0.85 calls | Low — buying vega |
+| Cash-Secured Put | DTE 30–45 | 0.15–0.30 puts | High — selling vega |
 
-- Agentic research loop: Claude decides which tools to call and synthesises the results
-- BSM Greeks (delta, gamma, theta, vega) computed per contract — pure Python, no C dependencies
-- Per-ticker session memory: position and structured session history persist across runs
-- Interactive REPL with slash commands: `/summary`, `/strategy`, `/position`, `/exit`
-- JSONL session logs for every run
+Orchestrated with LangGraph: a conditional edge routes on the selected strategy, and an
+`interrupt()` pauses the graph for human review before the final table.
+
+> **v1.0 is a pivot.** theta-agent was previously a single-ticker conversational agent that
+> derived one strategy from a five-signal Signal Scorecard. That product and its CLI/TUI entry
+> points were removed — see `CHANGELOG.md`.
 
 ## Quickstart
 
-theta-agent lives inside the [agentic-cookbook](../../) monorepo's `agents/` directory as a standalone example, with its own dependencies and virtualenv.
+theta-agent lives inside the [agentic-cookbook](../../) monorepo's `agents/` directory as a
+standalone example, with its own dependencies and virtualenv.
 
 ```bash
 git clone https://github.com/shaokiat/agentic-cookbook.git
 cd agentic-cookbook/agents/theta-agent
 uv venv && uv pip install -e .
 source .venv/bin/activate
-cp .env.example .env  # add your ANTHROPIC_API_KEY
-python theta.py AAPL
+chainlit run ui/app.py
 ```
 
-Requires Python ≥ 3.11 and a valid `ANTHROPIC_API_KEY`.
+Requires Python ≥ 3.11.
 
-## Usage
+## Pipeline
 
 ```
-python theta.py <TICKER>
+validate_selection → <route_by_strategy> ─┬→ screen_chain_leaps ─┐
+                                          └→ screen_chain_csp   ─┴→ fetch_iv_context
+    → tag_thesis → human_review [interrupt()] → present_summary → END
 ```
 
-At startup, theta-agent loads any stored position for the ticker and lets you keep, update, or clear it. The agent then runs the research phase (tool calls logged to `logs/`) and drops into an interactive chat with the full context in memory.
-
-### Slash commands
-
-| Command | Behaviour |
+| Node | Does |
 |---|---|
-| `/summary` | One-paragraph recap of ticker, price, thesis, and recommended strategy |
-| `/strategy` | Re-states the strategy in full standard format |
-| `/position` | Re-states your declared position and how it interacts with the strategy |
-| `/exit` | Saves state and exits (alias: `exit`, `quit`, `q`) |
+| `validate_selection` | Normalises tickers, applies the strategy's DTE/delta/liquidity defaults |
+| `screen_chain_leaps` / `screen_chain_csp` | Tier-1 filter: DTE, delta, open interest, bid-ask spread |
+| `fetch_iv_context` | IV rank/percentile per ticker; flags each favourable or not for the strategy |
+| `tag_thesis` | Annotates survivors with a static thematic tag from `config/themes.py` |
+| `human_review` | Pauses for approve / reject / resubmit — nothing is auto-approved |
 
-## Tools
+## Configuration
 
-| Tool | Returns |
-|---|---|
-| `get_price_data` | Price, 52-wk range, P/E, beta, sector, 1-month return |
-| `get_news` | Up to 10 recent headlines with title, publisher, summary |
-| `get_financials` | Valuation ratios, margins, growth rates, balance sheet health, analyst consensus |
-| `get_options_chain` | Top 5 calls + puts by OI within 10% of spot, IV, bid/ask, and BSM Greeks |
+| Variable | Purpose | Default |
+|---|---|---|
+| `THETA_ACCOUNT_SIZE` | Collateral ceiling for CSP candidates | `50000` |
+| `BRAVE_API_KEY` | Optional — enables the `search_web` fetcher | unset |
 
-## Project structure
+Chain data comes from yfinance. There is no live brokerage connection, so CSP collateral is
+checked against `THETA_ACCOUNT_SIZE` rather than real buying power.
 
-```
-theta-agent/
-├── theta.py              ← CLI entry point
-├── theta/
-│   ├── agent.py          ← ThetaAgent: research loop + chat REPL
-│   ├── tools.py          ← tool implementations, schemas, dispatcher
-│   ├── models.py         ← Pydantic models
-│   ├── prompts.py        ← system prompt
-│   ├── logger.py         ← JSONL session logger
-│   └── state.py          ← per-ticker JSON state
-├── docs/                 ← architecture and tool reference
-├── tests/
-└── pyproject.toml
+## Tests
+
+```bash
+# from the repo root
+PYTHONPATH=agents/theta-agent .venv/bin/python -m pytest agents/theta-agent/tests/ -q
 ```
 
-## Disclaimer
+## Known limitations
 
-This tool is for research and educational purposes only. Nothing it produces constitutes financial or investment advice.
+- No live buying power — collateral is checked against a static configured account size.
+- IV rank requires an external historical-IV source; until that lands, `fetch_iv_context` is a
+  pass-through stub that marks every ticker favourable.

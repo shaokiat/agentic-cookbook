@@ -1,23 +1,18 @@
 [project]
 name = "theta-agent"
-version = "0.6.0"
-description = "CLI options strategy research tool powered by Claude"
+version = "1.0.0"
+description = "Multi-strategy options screener orchestrated with LangGraph"
 requires-python = ">=3.11"
 dependencies = [
-    "anthropic",
+    "langgraph",
     "yfinance",
     "python-dotenv",
     "pydantic>=2.0",
     "requests>=2.34.2",
-    "textual>=8.2.7",
-    "litellm",
 ]
 
 [project.optional-dependencies]
 dev = ["pytest"]
 
-[project.scripts]
-theta = "theta:main"
-
 [tool.setuptools.packages.find]
-include = ["theta*", "tools*"]
+include = ["theta*", "tools*", "graph*"]

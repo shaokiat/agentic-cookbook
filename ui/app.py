@@ -59,7 +59,6 @@ nav_pages = {
         ],
         "Full Agents": [
             st.Page("pages/mini_researcher.py", title="Mini Researcher"),
-            st.Page("pages/theta_agent.py", title="theta-agent"),
         ],
     },
     "Inference & Serving": {
