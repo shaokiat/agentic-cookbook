@@ -5,6 +5,8 @@ description = "Multi-strategy options screener orchestrated with LangGraph"
 requires-python = ">=3.11"
 dependencies = [
     "langgraph",
+    "chainlit>=2.12,<3",
+    "pandas",
     "yfinance",
     "python-dotenv",
     "pydantic>=2.0",

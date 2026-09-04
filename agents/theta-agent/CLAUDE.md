@@ -11,6 +11,9 @@ theta-agent lives at `agents/theta-agent/` in the `agentic-cookbook` monorepo wi
 `pyproject.toml`. Dependencies belong in that file, **not** the repo root's.
 
 ```bash
+make theta-ui              # from the monorepo root, port 8001
+
+# or standalone
 cd agents/theta-agent
 uv venv && uv pip install -e .
 chainlit run ui/app.py
@@ -28,7 +31,8 @@ PYTHONPATH=agents/theta-agent .venv/bin/python -m pytest agents/theta-agent/test
 theta-agent/
 ├── graph/
 │   ├── state.py          ← ScreenerState, STRATEGY_DEFAULTS, LIQUIDITY_DEFAULTS
-│   ├── nodes.py          ← screen_chain_leaps/_csp, fetch_iv_context (stub), tag_thesis
+│   ├── nodes.py          ← screening nodes, fetch_iv_context (stub), tag_thesis,
+│                           human_review (interrupt), present_summary
 │   └── build.py          ← validate_selection, route_by_strategy, build_graph()
 ├── config/
 │   └── themes.py         ← WATCHLIST + static per-ticker thematic tags (pure data)
@@ -36,6 +40,8 @@ theta-agent/
 │   ├── options.py        ← fetch_chain(): flat contract list in a DTE/moneyness window + BSM Greeks
 │   └── price|news|financials|earnings|search.py
 │                         ← pre-pivot data fetchers, still working, not yet wired into the graph
+├── ui/
+│   └── app.py            ← Chainlit front-end: selection, streaming, HITL prompt, tables
 ├── theta/
 │   └── models.py         ← Pydantic models for the fetchers above
 └── tests/
@@ -65,6 +71,9 @@ network. `compiled_graph` is the default wiring.
 - Both screening nodes share `_screen()` in `graph/nodes.py`; strategy divergence is confined to
   `right`, `moneyness`, and a per-contract annotation callback. Do not fork it.
 - `fetch_iv_context` is a **stub** marking every ticker favourable until #5/#9/#10 land.
+- `human_review` must stay side-effect free: `interrupt()` re-runs the node from the top on resume.
+- The graph compiles with `MemorySaver`, which is per-process — a server restart loses in-flight
+  runs. Durable checkpointing is #13.
 
 ## Status
 
@@ -72,5 +81,9 @@ network. `compiled_graph` is the default wiring.
 |---|---|
 | #2 docs purge, #3 `fetch_chain`, #4 state + routing | done |
 | #7/#8 screening nodes, #11 `tag_thesis` | done |
-| #6/#12/#14 Chainlit UI + `interrupt()` | next |
+| #6/#12/#14 Chainlit UI + `interrupt()` | done |
 | #5 IV spike, #9/#10 `fetch_iv_context`, #13 checkpointing | blocked on a historical-IV API key |
+
+Run `chainlit run ui/app.py` **from `agents/theta-agent/`** — this package's `ui/` collides with
+the monorepo's root `ui/` Streamlit package, so `import ui.app` resolves to the wrong one from the
+repo root. Tests import `ui/app.py` by path for the same reason.

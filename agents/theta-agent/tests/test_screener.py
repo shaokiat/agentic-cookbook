@@ -242,3 +242,98 @@ class TestIVStub:
         out = fetch_iv_context({"raw_chains": {"MU": [_contract()], "NONE": []}})
         assert out["iv_annotated"]["MU"]["favorable"] is True
         assert "NONE" not in out["iv_annotated"]
+
+
+# ---------------------------------------------------------------------------
+# Human-in-the-loop and presentation
+# ---------------------------------------------------------------------------
+
+from langgraph.checkpoint.memory import MemorySaver
+from langgraph.types import Command
+
+from graph.build import build_graph
+from graph.nodes import present_summary
+
+
+class TestHumanInTheLoop:
+    def _graph(self):
+        self.upstream = []
+        return build_graph(
+            leaps_node=lambda s: self.upstream.append("leaps") or {
+                "raw_chains": {"MU": [_contract(ticker="MU")]}},
+            checkpointer=MemorySaver(),
+        )
+
+    def _run_to_interrupt(self, g, thread):
+        cfg = {"configurable": {"thread_id": thread}}
+        events = list(g.stream({"selected_tickers": ["MU"], "strategy_type": "long_leaps"}, config=cfg))
+        return cfg, events
+
+    def test_graph_pauses_before_finalizing(self):
+        g = self._graph()
+        cfg, events = self._run_to_interrupt(g, "t-pause")
+        assert any("__interrupt__" in e for e in events)
+        assert g.get_state(cfg).values.get("final_candidates") is None
+
+    def test_interrupt_payload_carries_candidates_and_errors(self):
+        g = self._graph()
+        _, events = self._run_to_interrupt(g, "t-payload")
+        value = next(e["__interrupt__"][0].value for e in events if "__interrupt__" in e)
+        assert value["candidates"] and value["strategy_type"] == "long_leaps"
+        assert "errors" in value
+
+    def test_resume_does_not_rerun_upstream_nodes(self):
+        g = self._graph()
+        cfg, _ = self._run_to_interrupt(g, "t-resume")
+        assert self.upstream == ["leaps"]
+        g.invoke(Command(resume={"action": "approve"}), config=cfg)
+        assert self.upstream == ["leaps"]  # screening did not repeat
+
+    def test_approve_yields_candidates(self):
+        g = self._graph()
+        cfg, _ = self._run_to_interrupt(g, "t-approve")
+        out = g.invoke(Command(resume={"action": "approve"}), config=cfg)
+        assert len(out["final_candidates"]) == 1
+
+    def test_reject_ends_run_with_nothing(self):
+        g = self._graph()
+        cfg, _ = self._run_to_interrupt(g, "t-reject")
+        out = g.invoke(Command(resume={"action": "reject"}), config=cfg)
+        # reject routes straight to END, so present_summary never sets the key
+        assert out.get("final_candidates", []) == []
+
+    def test_nothing_is_auto_approved(self):
+        """A single surviving candidate must still stop at the checkpoint."""
+        g = self._graph()
+        cfg, _ = self._run_to_interrupt(g, "t-single")
+        assert g.get_state(cfg).next == ("human_review",)
+
+    def test_selected_subset_narrows_the_output(self):
+        state = {"human_decision": "approve", "human_selected_subset": ["NVDA"],
+                 "thesis_tagged": [_contract(ticker="MU"), _contract(ticker="NVDA")]}
+        assert [c["ticker"] for c in present_summary(state)["final_candidates"]] == ["NVDA"]
+
+
+class TestCandidateFrame:
+    def _frame(self, rows, strategy):
+        # Imported by path: this agent's ui/ collides with the monorepo's root ui/ package.
+        import importlib.util
+        from pathlib import Path
+        path = Path(__file__).resolve().parent.parent / "ui" / "app.py"
+        spec = importlib.util.spec_from_file_location("theta_ui_app", path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod.candidate_frame(rows, strategy)
+
+    def test_leaps_columns(self):
+        cols = self._frame([_contract(ticker="MU", breakeven=110.1, iv_rank=None, theme="x")], "long_leaps").columns
+        assert "breakeven" in cols and "collateral_required" not in cols
+
+    def test_csp_columns(self):
+        row = _contract(ticker="MU", collateral_required=9000.0, iv_rank=None, theme="x")
+        cols = self._frame([row], "csp").columns
+        assert "collateral_required" in cols and "breakeven" not in cols
+
+    def test_missing_optional_column_does_not_raise(self):
+        """collateral_flag is absent unless a candidate is unaffordable."""
+        assert "collateral_flag" not in self._frame([_contract(ticker="MU")], "csp").columns

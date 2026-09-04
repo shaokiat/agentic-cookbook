@@ -48,3 +48,6 @@ examples/logs/
 
 # Generated from deploy/engines.yaml for `make include`
 .engines.mk
+
+.chainlit/
+.files/

@@ -11,7 +11,7 @@
 #
 # Setup for all three: examples/07_inference/00_running_engines.md
 
-.PHONY: help ui probe bench config serve-vllm serve-mlx serve-ollama install-mlx pull-ollama stop
+.PHONY: help ui theta-ui probe bench config serve-vllm serve-mlx serve-ollama install-mlx pull-ollama stop
 
 # Models and tuning parameters live in deploy/engines.yaml, shared with serve.sh. Make
 # cannot read YAML, so engines.py renders it to a KEY=VALUE file make can include -
@@ -35,6 +35,11 @@ OLLAMA_NUM_PARALLEL ?= 32
 OLLAMA_CONTEXT_LENGTH ?= 8192
 
 MLX_VENV ?= $(HOME)/.venv-mlx-lm
+# theta-agent is a standalone project with its own venv (see its README); fall back to the
+# root one when it has not been created.
+THETA_DIR := agents/theta-agent
+THETA_PY := $(if $(wildcard $(THETA_DIR)/.venv/bin/python),$(CURDIR)/$(THETA_DIR)/.venv/bin/python,$(CURDIR)/.venv/bin/python)
+THETA_PORT ?= 8001
 ENGINE ?= vllm
 # Ollama lists its whole model store, so when several are pulled and none is resident the
 # harness cannot tell which one you mean. Set this (or LOCAL_MODEL in .env) to settle it.
@@ -53,12 +58,20 @@ help:
 	@echo "  make ui                    Streamlit app (run sweeps from the browser)"
 	@echo "  make config                show the active serving config"
 	@echo ""
+	@echo "Agents"
+	@echo "  make theta-ui              theta-agent options screener (Chainlit) on :$(THETA_PORT)"
+	@echo ""
 	@echo "One-time installs:  make install-mlx   make pull-ollama"
 	@echo ""
 	@echo "Ollama with several models pulled: make probe LOCAL_MODEL=$(OLLAMA_MODEL)"
 
 ui:
 	.venv/bin/streamlit run ui/app.py
+
+# Must run from $(THETA_DIR): its ui/ package shadows the cookbook's root ui/, so importing
+# the app from here resolves to the wrong one. Port differs from the engines' $(LOCAL_PORT).
+theta-ui:
+	cd $(THETA_DIR) && $(THETA_PY) -m chainlit run ui/app.py --port $(THETA_PORT)
 
 # --- Engines ----------------------------------------------------------------
 serve-vllm:
