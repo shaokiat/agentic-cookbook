@@ -1,5 +1,7 @@
 """Screening and annotation nodes. Each returns a partial state dict."""
 
+from langgraph.types import interrupt
+
 from config.themes import WATCHLIST_THEMES
 from tools.options import fetch_chain
 
@@ -92,3 +94,27 @@ def tag_thesis(state: ScreenerState) -> dict:
     tagged.sort(key=lambda c: (c["iv_rank"] is None,
                                c["iv_rank"] if ascending else -(c["iv_rank"] or 0)))
     return {"thesis_tagged": tagged}
+
+
+def human_review(state: ScreenerState) -> dict:
+    """Pauses the graph. Kept free of side effects — interrupt() re-runs the node on resume."""
+    decision = interrupt({
+        "candidates": state["thesis_tagged"],
+        "strategy_type": state["strategy_type"],
+        "errors": state.get("errors", []),
+        "message": "Review candidates before finalizing.",
+    })
+    return {
+        "human_decision": decision.get("action"),
+        "human_selected_subset": decision.get("selected_subset"),
+    }
+
+
+def present_summary(state: ScreenerState) -> dict:
+    if state.get("human_decision") != "approve":
+        return {"final_candidates": []}
+    subset = state.get("human_selected_subset")
+    candidates = state["thesis_tagged"]
+    if subset:
+        candidates = [c for c in candidates if c["ticker"] in set(subset)]
+    return {"final_candidates": candidates}

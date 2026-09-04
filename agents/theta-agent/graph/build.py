@@ -2,9 +2,17 @@
 
 import os
 
+from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph
 
-from .nodes import fetch_iv_context, screen_chain_csp, screen_chain_leaps, tag_thesis
+from .nodes import (
+    fetch_iv_context,
+    human_review,
+    present_summary,
+    screen_chain_csp,
+    screen_chain_leaps,
+    tag_thesis,
+)
 from .state import (
     DEFAULT_ACCOUNT_SIZE,
     LIQUIDITY_DEFAULTS,
@@ -53,6 +61,8 @@ def build_graph(
     g.add_node("screen_chain_csp", csp_node)
     g.add_node("fetch_iv_context", iv_node)
     g.add_node("tag_thesis", tag_thesis)
+    g.add_node("human_review", human_review)
+    g.add_node("present_summary", present_summary)
 
     g.set_entry_point("validate_selection")
     g.add_conditional_edges(
@@ -63,8 +73,16 @@ def build_graph(
     g.add_edge("screen_chain_leaps", "fetch_iv_context")
     g.add_edge("screen_chain_csp", "fetch_iv_context")
     g.add_edge("fetch_iv_context", "tag_thesis")
-    g.add_edge("tag_thesis", END)
+    g.add_edge("tag_thesis", "human_review")
+    # reject ends the run without a summary; approve and resubmit fall through
+    g.add_conditional_edges(
+        "human_review",
+        lambda s: "reject" if s.get("human_decision") == "reject" else "present_summary",
+        {"reject": END, "present_summary": "present_summary"},
+    )
+    g.add_edge("present_summary", END)
     return g.compile(checkpointer=checkpointer)
 
 
-compiled_graph = build_graph()
+# interrupt() needs a checkpointer to resume; MemorySaver is per-process (see #13).
+compiled_graph = build_graph(checkpointer=MemorySaver())

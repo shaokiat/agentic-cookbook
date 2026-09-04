@@ -67,6 +67,10 @@ PYTHONPATH=agents/theta-agent .venv/bin/python -m pytest agents/theta-agent/test
 
 ## Known limitations
 
+- Ticker selection is a validated comma-separated list, not a multi-select widget — Chainlit's
+  `AskActionMessage` is single-select and a custom element wasn't worth it for v1.
+- `Re-screen` at the approval step is not implemented; it currently ends the run.
 - No live buying power — collateral is checked against a static configured account size.
+- `MemorySaver` is per-process: restarting the server loses an in-flight run.
 - IV rank requires an external historical-IV source; until that lands, `fetch_iv_context` is a
   pass-through stub that marks every ticker favourable.

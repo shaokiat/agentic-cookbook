@@ -28,3 +28,6 @@ htmlcov/
 # IDE / tools
 .DS_Store
 .claude/settings.local.json
+
+.chainlit/
+.files/
