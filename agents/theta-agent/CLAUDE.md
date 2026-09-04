@@ -11,6 +11,9 @@ theta-agent lives at `agents/theta-agent/` in the `agentic-cookbook` monorepo wi
 `pyproject.toml`. Dependencies belong in that file, **not** the repo root's.
 
 ```bash
+make theta-ui              # from the monorepo root, port 8001
+
+# or standalone
 cd agents/theta-agent
 uv venv && uv pip install -e .
 chainlit run ui/app.py

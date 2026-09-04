@@ -30,6 +30,9 @@ source .venv/bin/activate
 chainlit run ui/app.py
 ```
 
+From the monorepo root, `make theta-ui` does the same on port 8001 — it uses this project's
+venv when one exists and the cookbook's root venv otherwise.
+
 Requires Python ≥ 3.11.
 
 ## Pipeline
