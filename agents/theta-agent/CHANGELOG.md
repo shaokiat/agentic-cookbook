@@ -2,6 +2,31 @@
 
 All notable changes to theta-agent are documented here.
 
+## v1.0.0 — Pivot to multi-strategy screener
+
+**Breaking.** theta-agent is no longer a single-ticker conversational research agent. It is a
+multi-ticker LangGraph screener for Long ITM LEAPS and Cash-Secured Puts.
+
+Removed:
+- `theta.py` (CLI), `theta_ui.py` (Textual TUI), `theta/agent.py` (Anthropic tool loop),
+  `theta/prompts.py`, `theta/state.py`, `prompts/system.md`
+- The Signal Scorecard framework in its entirety — Directional Bias, Event Clarity, IV Regime,
+  Conviction, Liquidity — and the `/summary` `/scorecard` `/strategy` `/position` slash commands
+- `get_options_chain` and its OLS IV surface fit, `iv_excess`, `iv_fitted`, and `skew`
+- `tools/__init__.py`'s Anthropic `TOOLS` list and `process_tool_call` dispatcher
+- The root Streamlit page `ui/pages/theta_agent.py`, which rendered scorecard output
+- `docs/OVERVIEW.md`, `docs/tools.md`, `docs/state_store.md`
+
+Added:
+- `tools/options.py::fetch_chain` — flat contract list within an arbitrary DTE and moneyness
+  window, with BSM Greeks. The previous fetcher capped at 3 expiries ≥14 DTE and ±15% moneyness,
+  which excluded deep-ITM LEAPS entirely.
+- `graph/state.py` — `ScreenerState` with per-strategy parameter defaults
+- `graph/build.py` — graph skeleton with the `route_by_strategy` conditional edge
+
+Kept: the `tools/` data fetchers (price, news, financials, earnings, search), `theta/models.py`,
+`theta/logger.py`.
+
 ## [Unreleased]
 
 ### Added — Scorecard v2 (post v0.9 refinement)

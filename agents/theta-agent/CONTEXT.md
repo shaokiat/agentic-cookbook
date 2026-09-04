@@ -1,6 +1,6 @@
 ---
 name: theta-agent-context
-description: Domain language and resolved design decisions for theta-agent
+description: Domain language and resolved design decisions for the theta-agent screener
 metadata:
   type: project
 ---
@@ -9,47 +9,67 @@ metadata:
 
 ## Core purpose
 
-theta-agent is a research head-start tool for retail options traders. Given a ticker, it produces a directional verdict, a signal scorecard, and one concrete strategy recommendation, then opens a free-form chat for the user to explore that strategy. It is an ideation tool, not a trade executor.
+theta-agent is a **multi-ticker options screener**. The user picks a watchlist subset and one
+strategy; the screener filters every name's chain against that strategy's DTE, delta, and
+liquidity profile, annotates survivors with an IV regime read and a thematic tag, and presents
+a ranked table for human approval. It is an ideation tool, not a trade executor.
+
+It replaced a single-ticker conversational agent that derived one strategy from a five-signal
+Signal Scorecard. That product is gone; see `CHANGELOG.md` v1.0.0.
 
 ## Key terms
 
-**Signal Scorecard**
-The structured output of the research phase. Five signals scored 1–10, displayed in reasoning-chain order: Directional Bias → Event Clarity → IV Regime → Conviction → Liquidity. All five signals read higher = better setup. A one-line directional verdict is printed before the scorecard as a headline.
+**strategy_type**
+`long_leaps` or `csp`. Chosen by the user *before* the graph runs — it selects the branch taken
+at the `route_by_strategy` conditional edge, and the DTE/delta parameter set applied to every
+downstream node.
 
-**Directional Bias**
-Signal 1. Measures bull/bear/neutral conviction from price trend, RSI-14, financials, analyst consensus, and news. 1=strong bear, 5=neutral, 10=strong bull. RSI > 75 is an overbought warning; caps bullish score at 8 unless all other signals are exceptionally strong.
+**Long ITM LEAPS**
+DTE > 500, delta 0.70–0.85 calls. A stock substitute: high delta, low time decay per day,
+less capital than shares. Favourable when IV is **low** — you are buying vega.
 
-**Event Clarity**
-Signal 2. Measures how clean the target expiry window is from binary events. 10=no near-term catalyst, 1=earnings imminent inside expiry. Higher = better (deliberately inverted from the intuitive "Event Risk" framing to match the other four signals). Low Event Clarity (≤ 3) mandates defined-risk structures.
+**Cash-Secured Put (CSP)**
+DTE 30–45, delta 0.15–0.30 puts, fully collateralised. Favourable when IV is **high** — you are
+selling vega. Collateral is `strike × 100` per contract.
 
-**IV Regime**
-Signal 3. Measures whether options are rich or cheap via `iv_excess` (contract IV minus OLS surface fit), enriched by `skew` (OTM put IV − OTM call IV at ~0.25 delta). Positive skew = puts richer than calls = elevated downside hedging demand. 1=very cheap, 10=very rich.
+**iv_rank / iv_percentile**
+Where a name's current IV sits against its own trailing IV history. Rank is position within the
+min–max range; percentile is the fraction of history below today. Time-series measures, computed
+from an external historical-IV source — not derivable from a single day's chain.
 
-**Conviction**
-Signal 4. Measures internal signal agreement — how many sub-signals (price, RSI, news, fundamentals, analyst consensus, short interest) align with the directional score. Short interest is always named explicitly as a sub-signal when data is available. Controls strike width and delta: high conviction → ATM-adjacent; low conviction → further OTM.
+**favorable**
+Per-ticker boolean from `fetch_iv_context`. Direction depends on `strategy_type`: low IV is
+favourable for `long_leaps`, high IV for `csp`. The same node computes both — only the threshold
+comparison flips.
 
-**Liquidity**
-Signal 5. Execution quality at target strikes — bid-ask spread as % of mid and open interest. Controls whether to warn about fill slippage.
+**theme**
+A static, human-authored thematic tag per ticker (`config/themes.py`), e.g. `MU →
+memory_supercycle_bullish`. The screener tags candidates with a *pre-existing* view; it does not
+generate one. No LLM call is involved.
 
-**iv_excess**
-A contract's actual IV minus the OLS-fitted IV from the surface model (`IV ≈ a + b·m + c·m² + d·√T + e·m·√T`). Positive = IV rich (favours selling); negative = IV cheap (favours buying). Primary signal for contract selection within the chosen strategy family.
+**collateral_flag**
+Set on a CSP candidate whose collateral exceeds the configured account size. Flagged, never
+dropped — you may want to see it in order to trim another position first.
 
-**skew**
-Average IV of OTM puts (~0.25 delta) minus average IV of OTM calls (~0.25 delta), computed from the first expiry. Positive skew = downside hedging demand elevated. Reported alongside `iv_excess` in the IV Regime signal.
-
-**RSI-14**
-14-period Wilder RSI computed from 3 months of daily closes. Reported in Directional Bias as a momentum/overbought-oversold sub-signal. > 75 = overbought warning; < 25 = oversold support.
-
-**HITL chat**
-Phase 2 of a theta-agent session. After the scorecard and strategy recommendation, the user enters a free-form REPL to interrogate the recommended strategy — stress-test scenarios, adjust parameters, ask about mechanics. The chat carries the full research context (tool results, scorecard, recommendation) without re-fetching data. It is for depth on the chosen strategy, not for selecting between alternatives.
-
-**one strategy**
-theta-agent always recommends exactly one strategy per session. The scorecard eliminates alternatives; the "Why not X" fields record the rejected strategies and their reasons. The chat loop is the mechanism for challenging the recommendation, not for picking between options.
+**Human approval checkpoint**
+A LangGraph `interrupt()` after `tag_thesis`. The graph pauses, surfaces candidates, and resumes
+only on an explicit approve / reject / resubmit. Nothing is auto-approved, including a single
+surviving candidate.
 
 ## Resolved design decisions
 
-- **One strategy, not multiple candidates** — the scorecard framework does the selection work; surfacing multiple strategies shifts the cognitive load back to the user without adding value.
-- **Event Risk renamed to Event Clarity, scale inverted** — all five signals now read higher = better setup; prevents misreading a low Event Risk score as "low quality."
-- **Signal display order** — Directional → Event Clarity → IV Regime → Conviction → Liquidity, matching the reasoning chain so readers see event context before interpreting IV numbers.
-- **Confidence qualifier dropped** — data quality caveats appear inline in the Against field only when genuinely low; "High" confidence on every signal added noise without value.
-- **Enrich existing signals rather than add a 6th** — RSI added to Directional Bias; short interest promoted to named sub-signal in Conviction; skew added to IV Regime. No new signals, no new data sources.
+- **Chain data is yfinance**, via `tools/options.py::fetch_chain`. IBKR is out of scope: the IBKR
+  tools available inside a Claude chat are MCP connectors, not importable Python. Consequence —
+  no live buying power; CSP collateral is checked against a static configured account size.
+- **IV rank replaced `iv_excess`.** The old cross-sectional measure (contract IV minus an OLS
+  surface fit) answered "is this contract rich relative to its neighbours today". Screening needs
+  "is this name's IV high relative to its own history", which is a different question.
+- **Strategy is selected, not derived.** The scorecard's job was choosing a strategy for one
+  ticker. The screener inverts this: the strategy is the input, and the output is which names fit it.
+- **Strategy parameters live in `ScreenerState`, not in nodes.** `dte_min`, `dte_max`,
+  `delta_range`, and the liquidity thresholds are state fields so both branches share the
+  downstream nodes. This is the mechanism for adding a third strategy.
+- **Nodes return partial state dicts**, never a mutated full state — required for correctness
+  once any two nodes run in parallel.
+- **Per-ticker failures accumulate in `state["errors"]`** and are surfaced with the results. A
+  sweep of 19 names must not die on one delisted ticker, and must not silently hide six failures.

@@ -2,11 +2,9 @@
 Unit tests for the tools/ package — no network calls.
 
 Coverage:
-  - get_options_chain: strike filtering (±15%), multi-expiry structure, Greeks, iv_excess, skew
   - get_price_data: field mapping, RSI-14 computation
   - get_news: legacy flat shape and newer content{} shape
   - get_financials: field mapping, None exclusion, error handling
-  - process_tool_call: known tool dispatch and unknown tool error handling
 """
 
 import json
@@ -17,10 +15,8 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 import pytest
 
-from tools import process_tool_call
 from tools.financials import get_financials
 from tools.news import get_news
-from tools.options import get_options_chain
 from tools.price import get_price_data
 
 
@@ -50,175 +46,6 @@ def _mock_options_ticker(spot: float, calls: list, puts: list, expiry_days: int 
     mock_ticker.earnings_dates = None
     return mock_ticker
 
-
-# ---------------------------------------------------------------------------
-# get_options_chain — multi-expiry structure
-# ---------------------------------------------------------------------------
-
-class TestOptionsChainStructure:
-    """Result must use the v0.7 multi-expiry structure."""
-
-    def test_top_level_keys(self):
-        spot = 100.0
-        calls = [{"strike": 100.0, "bid": 2.0, "ask": 2.1, "impliedVolatility": 0.25, "volume": 100, "openInterest": 500}]
-        mock_ticker = _mock_options_ticker(spot, calls, [])
-        with patch("tools.options.yf.Ticker", return_value=mock_ticker):
-            result = get_options_chain("FAKE")
-        assert "current_price" in result
-        assert "expiries" in result
-
-    def test_expiry_has_calls_and_puts(self):
-        spot = 100.0
-        calls = [{"strike": 100.0, "bid": 2.0, "ask": 2.1, "impliedVolatility": 0.25, "volume": 100, "openInterest": 500}]
-        puts = [{"strike": 100.0, "bid": 2.0, "ask": 2.1, "impliedVolatility": 0.25, "volume": 100, "openInterest": 400}]
-        mock_ticker = _mock_options_ticker(spot, calls, puts)
-        with patch("tools.options.yf.Ticker", return_value=mock_ticker):
-            result = get_options_chain("FAKE")
-        expiry = result["expiries"][0]
-        assert "calls" in expiry
-        assert "puts" in expiry
-        assert "dte" in expiry
-        assert "earnings_count" in expiry
-
-    def test_no_atm_iv_in_top_level(self):
-        """atm_iv was removed in v0.7 — should not appear at the top level."""
-        spot = 100.0
-        calls = [{"strike": 100.0, "bid": 2.0, "ask": 2.1, "impliedVolatility": 0.25, "volume": 100, "openInterest": 500}]
-        mock_ticker = _mock_options_ticker(spot, calls, [])
-        with patch("tools.options.yf.Ticker", return_value=mock_ticker):
-            result = get_options_chain("FAKE")
-        assert "atm_iv" not in result
-
-
-# ---------------------------------------------------------------------------
-# get_options_chain — strike filtering (±15% of spot)
-# ---------------------------------------------------------------------------
-
-class TestStrikeFiltering:
-    """Strikes outside 15% of spot must be excluded."""
-
-    def test_out_of_range_strikes_excluded(self):
-        spot = 100.0
-        # 80 = 20% below, 125 = 25% above — both outside the 15% band
-        calls = [
-            {"strike": 80.0,  "bid": 1.0, "ask": 1.1, "impliedVolatility": 0.25, "volume": 500, "openInterest": 1000},
-            {"strike": 100.0, "bid": 2.0, "ask": 2.1, "impliedVolatility": 0.25, "volume": 300, "openInterest": 800},
-            {"strike": 125.0, "bid": 0.5, "ask": 0.6, "impliedVolatility": 0.25, "volume": 200, "openInterest": 600},
-        ]
-        mock_ticker = _mock_options_ticker(spot, calls, [])
-        with patch("tools.options.yf.Ticker", return_value=mock_ticker):
-            result = get_options_chain("FAKE")
-        strikes = [c["strike"] for c in result["expiries"][0]["calls"]]
-        assert 80.0 not in strikes
-        assert 125.0 not in strikes
-        assert 100.0 in strikes
-
-    def test_within_band_strikes_included(self):
-        """Strikes clearly within the ±15% band must be included."""
-        spot = 100.0
-        calls = [
-            {"strike": 87.0,  "bid": 1.0, "ask": 1.1, "impliedVolatility": 0.3, "volume": 100, "openInterest": 500},
-            {"strike": 113.0, "bid": 1.0, "ask": 1.1, "impliedVolatility": 0.3, "volume": 100, "openInterest": 400},
-        ]
-        mock_ticker = _mock_options_ticker(spot, calls, [])
-        with patch("tools.options.yf.Ticker", return_value=mock_ticker):
-            result = get_options_chain("FAKE")
-        strikes = [c["strike"] for c in result["expiries"][0]["calls"]]
-        assert 87.0 in strikes
-        assert 113.0 in strikes
-
-
-# ---------------------------------------------------------------------------
-# get_options_chain — Greeks
-# ---------------------------------------------------------------------------
-
-class TestGreeks:
-    """Each contract must carry BSM Greeks when IV is present; omit them when IV is absent."""
-
-    def _run(self, calls_rows, puts_rows, spot=100.0):
-        mock_ticker = _mock_options_ticker(spot, calls_rows, puts_rows)
-        with patch("tools.options.yf.Ticker", return_value=mock_ticker):
-            result = get_options_chain("FAKE")
-        return result["expiries"][0]
-
-    def test_call_greeks_present(self):
-        calls = [{"strike": 100.0, "bid": 2.0, "ask": 2.1, "impliedVolatility": 0.25, "volume": 100, "openInterest": 500}]
-        expiry = self._run(calls, [])
-        contract = expiry["calls"][0]
-        for greek in ("delta", "gamma", "theta", "vega"):
-            assert greek in contract, f"{greek} missing from call contract"
-
-    def test_put_greeks_present(self):
-        puts = [{"strike": 100.0, "bid": 2.0, "ask": 2.1, "impliedVolatility": 0.25, "volume": 100, "openInterest": 500}]
-        expiry = self._run([], puts)
-        contract = expiry["puts"][0]
-        for greek in ("delta", "gamma", "theta", "vega"):
-            assert greek in contract, f"{greek} missing from put contract"
-
-    def test_call_delta_positive(self):
-        calls = [{"strike": 100.0, "bid": 2.0, "ask": 2.1, "impliedVolatility": 0.25, "volume": 100, "openInterest": 500}]
-        assert self._run(calls, [])["calls"][0]["delta"] > 0
-
-    def test_put_delta_negative(self):
-        puts = [{"strike": 100.0, "bid": 2.0, "ask": 2.1, "impliedVolatility": 0.25, "volume": 100, "openInterest": 500}]
-        assert self._run([], puts)["puts"][0]["delta"] < 0
-
-    def test_atm_call_delta_near_half(self):
-        calls = [{"strike": 100.0, "bid": 2.0, "ask": 2.1, "impliedVolatility": 0.25, "volume": 100, "openInterest": 500}]
-        delta = self._run(calls, [], spot=100.0)["calls"][0]["delta"]
-        assert 0.4 < delta < 0.6
-
-    def test_theta_negative(self):
-        calls = [{"strike": 100.0, "bid": 2.0, "ask": 2.1, "impliedVolatility": 0.25, "volume": 100, "openInterest": 500}]
-        puts  = [{"strike": 100.0, "bid": 2.0, "ask": 2.1, "impliedVolatility": 0.25, "volume": 100, "openInterest": 500}]
-        expiry = self._run(calls, puts)
-        assert expiry["calls"][0]["theta"] < 0
-        assert expiry["puts"][0]["theta"] < 0
-
-    def test_vega_positive(self):
-        calls = [{"strike": 100.0, "bid": 2.0, "ask": 2.1, "impliedVolatility": 0.25, "volume": 100, "openInterest": 500}]
-        puts  = [{"strike": 100.0, "bid": 2.0, "ask": 2.1, "impliedVolatility": 0.25, "volume": 100, "openInterest": 500}]
-        expiry = self._run(calls, puts)
-        assert expiry["calls"][0]["vega"] > 0
-        assert expiry["puts"][0]["vega"] > 0
-
-    def test_missing_iv_omits_greeks(self):
-        calls = [{"strike": 100.0, "bid": 2.0, "ask": 2.1, "impliedVolatility": float("nan"), "volume": 100, "openInterest": 500}]
-        expiry = self._run(calls, [])
-        contract = expiry["calls"][0]
-        for greek in ("delta", "gamma", "theta", "vega"):
-            assert greek not in contract, f"{greek} should be absent when IV is NaN"
-
-
-# ---------------------------------------------------------------------------
-# get_options_chain — skew
-# ---------------------------------------------------------------------------
-
-class TestSkew:
-    """skew must be computed when OTM puts and calls at ~0.25 delta are available."""
-
-    def test_skew_present_when_otm_contracts_exist(self):
-        spot = 100.0
-        # Put at ~0.25 delta: strike below spot; call at ~0.25 delta: strike above spot
-        calls = [
-            {"strike": 100.0, "bid": 2.0, "ask": 2.1, "impliedVolatility": 0.25, "volume": 500, "openInterest": 2000},
-            {"strike": 108.0, "bid": 0.8, "ask": 0.9, "impliedVolatility": 0.22, "volume": 200, "openInterest": 800},
-        ]
-        puts = [
-            {"strike": 100.0, "bid": 2.0, "ask": 2.1, "impliedVolatility": 0.25, "volume": 500, "openInterest": 2000},
-            {"strike": 92.0,  "bid": 0.9, "ask": 1.0, "impliedVolatility": 0.30, "volume": 200, "openInterest": 900},
-        ]
-        mock_ticker = _mock_options_ticker(spot, calls, puts)
-        with patch("tools.options.yf.Ticker", return_value=mock_ticker):
-            result = get_options_chain("FAKE")
-        # skew may or may not be present depending on whether deltas fall in range —
-        # just assert the key exists at the top level (may be null for small chains)
-        assert "skew" in result or result.get("skew") is None
-
-
-# ---------------------------------------------------------------------------
-# get_price_data — RSI-14
-# ---------------------------------------------------------------------------
 
 class TestPriceData:
     """get_price_data must compute RSI-14 when sufficient history is available."""
@@ -365,40 +192,3 @@ class TestGetFinancials:
         with patch("tools.financials.yf.Ticker", return_value=mock_ticker):
             result = get_financials("FAKE")
         assert "error" in result
-
-    def test_get_financials_dispatched_by_process_tool_call(self):
-        mock_ticker = MagicMock()
-        mock_ticker.info = self._mock_info()
-        with patch("tools.financials.yf.Ticker", return_value=mock_ticker):
-            raw = process_tool_call("get_financials", {"ticker": "FAKE"})
-        parsed = json.loads(raw)
-        assert "error" not in parsed
-        assert parsed["ticker"] == "FAKE"
-
-
-# ---------------------------------------------------------------------------
-# process_tool_call — dispatch
-# ---------------------------------------------------------------------------
-
-class TestProcessToolCall:
-    """process_tool_call must route known tools and gracefully reject unknown ones."""
-
-    def test_unknown_tool_returns_error_json(self):
-        result = process_tool_call("nonexistent_tool", {"ticker": "AAPL"})
-        parsed = json.loads(result)
-        assert "error" in parsed
-        assert "nonexistent_tool" in parsed["error"]
-
-    def test_known_tool_is_dispatched(self):
-        mock_ticker = MagicMock()
-        mock_ticker.info = {"currentPrice": 150.0, "previousClose": 148.0,
-                            "fiftyTwoWeekHigh": 200.0, "fiftyTwoWeekLow": 120.0}
-        mock_ticker.history.return_value = pd.DataFrame(
-            {"Close": [145.0 + i * 0.5 for i in range(20)]},
-            index=pd.date_range("2024-01-01", periods=20),
-        )
-        with patch("tools.price.yf.Ticker", return_value=mock_ticker):
-            result = process_tool_call("get_price_data", {"ticker": "FAKE"})
-        parsed = json.loads(result)
-        assert "error" not in parsed
-        assert parsed["ticker"] == "FAKE"

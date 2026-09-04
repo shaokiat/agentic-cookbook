@@ -74,5 +74,5 @@ HOSTED_VLLM_API_BASE=http://localhost:8000/v1   # for the sidebar model picker
 
 ## 🤖 Agent Examples
 Beyond the concept-ladder examples, `agents/` hosts standalone agents built on these patterns — each a self-contained project with its own dependencies and virtualenv:
-- [`agents/theta-agent/`](agents/theta-agent/) — CLI/TUI options-strategy research agent (tool use, session memory, agentic research loop) powered by Claude.
+- [`agents/theta-agent/`](agents/theta-agent/) — LangGraph multi-strategy options screener (conditional routing, human-in-the-loop `interrupt()`, Chainlit UI).
 - [`agents/mini-researcher/`](agents/mini-researcher/) — simplified [gpt-researcher](https://github.com/assafelovic/gpt-researcher) port: plan → parallel search/scrape/compress → synthesize, composing Plan-and-Execute, multi-agent fan-out, and context compression into one pipeline.
