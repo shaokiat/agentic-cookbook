@@ -78,6 +78,21 @@ def live_panel(label: str):
     return label_slot, body_slot
 
 
+def render_markdown_with_mermaid(text: str) -> None:
+    """st.markdown doesn't render ```mermaid fences itself; split them out to st.mermaid_chart."""
+    parts = text.split("```mermaid")
+    st.markdown(parts[0])
+    for part in parts[1:]:
+        diagram, _, rest = part.partition("```")
+        st.mermaid_chart(diagram.strip())
+        st.markdown(rest)
+
+
+def about_from(text: str):
+    """Wraps a CORE_CONCEPT markdown string as an about_extra callable for page_tabs/chat_page/single_run_page."""
+    return lambda: render_markdown_with_mermaid(text)
+
+
 def _about_content(relpath: str | None, mod=None, *, walkthrough_path: str | None = None,
                     reference_paths: list[str] | None = None, blog_label: str | None = None,
                     blog_url: str | None = None, blog_note: str | None = None,
@@ -212,7 +227,8 @@ def render_events(gen) -> str:
     return final
 
 
-def chat_page(title: str, caption: str, relpath: str, builder: str = "build_agent", **build_kwargs):
+def chat_page(title: str, caption: str, relpath: str, builder: str = "build_agent",
+              about_extra=None, **build_kwargs):
     """Multi-turn chat page: one persistent agent per session, chat input drives run_events."""
     mod = load_example(relpath)
     model = selected_model()
@@ -226,7 +242,7 @@ def chat_page(title: str, caption: str, relpath: str, builder: str = "build_agen
         if st.button("Reset conversation", key=f"reset::{relpath}"):
             st.session_state.pop(state_key, None)
     st.caption(caption)
-    tab_demo = page_tabs(relpath, mod)
+    tab_demo = page_tabs(relpath, mod, about_extra=about_extra)
 
     if state_key not in st.session_state:
         st.session_state[state_key] = {
@@ -252,13 +268,13 @@ def chat_page(title: str, caption: str, relpath: str, builder: str = "build_agen
 
 
 def single_run_page(title: str, caption: str, relpath: str, builder: str = "build_agent",
-                    default_prompt_attr: str = "DEFAULT_PROMPT", **build_kwargs):
+                    default_prompt_attr: str = "DEFAULT_PROMPT", about_extra=None, **build_kwargs):
     """One-shot demo page: prefilled prompt, Run button, events streamed inline."""
     st.title(title)
     st.caption(caption)
 
     mod = load_example(relpath)
-    tab_demo = page_tabs(relpath, mod)
+    tab_demo = page_tabs(relpath, mod, about_extra=about_extra)
 
     with tab_demo:
         agent = getattr(mod, builder)(model=selected_model(), **build_kwargs)
