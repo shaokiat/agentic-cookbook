@@ -4,47 +4,13 @@ from concurrent.futures import ThreadPoolExecutor
 
 import streamlit as st
 
-from common import about_from, live_panel, page_tabs, selected_model
+from common import live_panel, page_tabs, selected_model
 
 st.title("Mini Researcher")
 st.caption(
     "query → plan sub-questions → parallel search/scrape/compress → cited report. "
     "Progress events stream from worker threads through a queue."
 )
-
-CORE_CONCEPT = """\
-**What it is**
-
-A case study composing three patterns from elsewhere in this cookbook into one real pipeline:
-Plan-and-Execute (a planner decomposes the query before any research happens), parallel
-fan-out/fan-in (each sub-question is researched concurrently), and hybrid-search context
-compression (scraped pages are filtered down to only the relevant chunks before synthesis).
-
-```mermaid
-flowchart TD
-    Q[Query] --> P["Planner — one LLM call → 2-4 sub-questions"]
-    P --> W1[Sub-question 1: search → scrape → compress]
-    P --> W2[Sub-question 2: search → scrape → compress]
-    P --> W3[Sub-question 3: search → scrape → compress]
-    W1 --> Agg[Aggregated compressed context]
-    W2 --> Agg
-    W3 --> Agg
-    Agg --> S["Synthesizer — one LLM call, abstains if no relevant context"]
-    S --> R[Cited report]
-```
-
-**Why a fixed pipeline instead of a ReAct agent**
-
-Unlike the ReAct examples, there's no per-step "decide what to do next" loop here — the shape of
-the work (plan, then fan out, then compress, then synthesize) is fixed in code. That's a
-deliberate trade against flexibility: research decomposes cleanly into the same four stages
-every time, so there's no need to pay for a model call to re-derive the plan at each step. Each
-sub-question's search/scrape/compress runs in its own thread (~3x speedup over sequential on a
-3-query run), and per-URL/per-sub-query failures are isolated so one dead link never kills the
-whole run.
-"""
-
-
 tab_demo = page_tabs(
     None,
     walkthrough_path="agents/mini-researcher/README.md",
@@ -53,7 +19,6 @@ tab_demo = page_tabs(
     blog_url="https://shaokiat.github.io/shaokiat-blog/docs/genai-agents/use_cases/researcher-agent/",
     blog_note="Covers why this is a fixed Planner → Workers → Compression → Synthesizer "
               "pipeline instead of a ReAct loop, and when you'd reach for each shape.",
-    about_extra=about_from(CORE_CONCEPT),
 )
 
 with tab_demo:

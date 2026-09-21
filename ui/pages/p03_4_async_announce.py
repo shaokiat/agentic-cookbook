@@ -6,7 +6,7 @@ import streamlit as st
 
 from core.model import ModelProvider
 
-from common import about_from, cost_metric, live_panel, load_example, page_tabs, selected_model
+from common import cost_metric, live_panel, load_example, page_tabs, selected_model
 
 st.title("Async Announce")
 st.caption(
@@ -14,41 +14,9 @@ st.caption(
     "drains it without blocking — results arrive in completion order, not spawn order."
 )
 
-CORE_CONCEPT = """\
-**What it is**
-
-Workers run in daemon threads and push an `Announcement` onto a shared queue when they finish,
-instead of the parent blocking on each one in turn. The parent polls that queue between ticks
-without blocking, so results surface in completion order — not spawn order — and a slow worker
-never holds up a fast one from being processed.
-
-```mermaid
-flowchart TD
-    Spawn[Parent spawns daemon-thread workers] --> W1[Worker 1]
-    Spawn --> W2[Worker 2]
-    Spawn --> W3[Worker 3]
-    W1 -->|announce when done| Q[(Shared queue)]
-    W2 -->|announce when done| Q
-    W3 -->|announce when done| Q
-    Q --> Poll["Parent polls queue each tick — non-blocking"]
-    Poll --> Synth[Synthesizer agent processes announcements as they arrive]
-```
-
-**Key insight — decoupled in time, not just in execution**
-
-This differs from Parallel Subagents in *when* results are consumed. There, the parent thread
-waits on `as_completed` until every worker is done. Here, the parent's own turn can advance —
-and its state persist — before any sub-agent finishes; announcements are drained opportunistically
-whenever the parent checks the queue. In a production system this queue becomes a real message
-bus, and an announcement re-enters the parent's session as an ordinary inbound message rather
-than a blocking return value — the same shape OpenClaw and Nanobot use to deliver sub-agent
-results back to a parent session.
-"""
-
-
 relpath = "examples/03_multi_agent_systems/04_async_announce.py"
 mod = load_example(relpath)
-tab_demo = page_tabs(relpath, mod, about_extra=about_from(CORE_CONCEPT))
+tab_demo = page_tabs(relpath, mod)
 
 tasks = mod.DEFAULT_TASKS
 
