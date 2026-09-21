@@ -4,7 +4,7 @@ YAML is the source of truth; Make and bash cannot parse it, so this renders the 
 values into the two flat forms they can consume. Keys become <SECTION>_<KEY> — vllm.model
 is VLLM_MODEL — except `local`, which drops the prefix (LOCAL_PORT, LOCAL_API_KEY).
 
-    python deploy/engines.py --make          # KEY=VALUE, for `include`
+    python deploy/engines.py --make          # KEY ?= VALUE, for `include`
     python deploy/engines.py --sh            # : "${KEY:=value}", for `eval` in bash
     python deploy/engines.py get vllm.model  # one value
 """
@@ -47,8 +47,11 @@ def main(argv: list[str]) -> int:
         for key, value in flat.items():
             print(f': "${{{key}:={value}}}"')
     else:
+        # `?=`, not `=`: a plain assignment in an included makefile overrides the
+        # environment and is then re-exported to recipes, silently discarding
+        # `VLLM_MAX_NUM_SEQS=4 make serve-vllm`.
         for key, value in flat.items():
-            print(f"{key}={value}")
+            print(f"{key} ?= {value}")
     return 0
 
 
