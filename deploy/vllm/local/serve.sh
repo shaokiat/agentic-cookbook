@@ -7,7 +7,7 @@
 # Model and tuning parameters live in deploy/engines.yaml, not in this file. Any of them
 # can still be overridden per-run:
 #
-#   VLLM_MODEL=mlx-community/Qwen3-4B-4bit ./deploy/vllm/local/serve.sh
+#   VLLM_MODEL=mlx-community/Qwen3.5-4B-8bit ./deploy/vllm/local/serve.sh
 #
 # Apple Silicon has no CUDA, so this uses the vllm-metal plugin (MLX compute backend).
 # It installs into its OWN venv (~/.venv-vllm-metal) — deliberately not the repo .venv,
@@ -26,11 +26,12 @@ else
   echo "warning: $CONF unreadable — falling back to built-in defaults" >&2
 fi
 
-MODEL="${VLLM_MODEL:-mlx-community/Qwen3-0.6B-4bit}"
+MODEL="${VLLM_MODEL:-mlx-community/Qwen3.5-4B-4bit}"
 PORT="${VLLM_PORT:-${LOCAL_PORT:-8000}}"
 API_KEY="${VLLM_API_KEY:-${LOCAL_API_KEY:-cookbook-local}}"
 MAX_LEN="${VLLM_MAX_MODEL_LEN:-8192}"
-MAX_SEQS="${VLLM_MAX_NUM_SEQS:-64}"
+MAX_SEQS="${VLLM_MAX_NUM_SEQS:-32}"
+MAX_BATCHED="${VLLM_MAX_NUM_BATCHED_TOKENS:-2048}"
 GPU_UTIL="${VLLM_GPU_MEMORY_UTILIZATION:-0.92}"
 VENV="${VLLM_METAL_VENV:-$HOME/.venv-vllm-metal}"
 
@@ -60,7 +61,7 @@ MSG
 fi
 
 echo "Serving $MODEL on http://localhost:$PORT/v1 (api key: $API_KEY)"
-echo "  max_model_len=$MAX_LEN max_num_seqs=$MAX_SEQS gpu_memory_utilization=$GPU_UTIL $PREFIX_FLAG"
+echo "  max_model_len=$MAX_LEN max_num_seqs=$MAX_SEQS max_num_batched_tokens=$MAX_BATCHED gpu_memory_utilization=$GPU_UTIL $PREFIX_FLAG"
 echo "  (from $CONF)"
 echo "Point the cookbook at it with these in .env:"
 echo "  LOCAL_API_BASE=http://localhost:$PORT/v1"
@@ -73,6 +74,7 @@ exec "$VENV/bin/vllm" serve "$MODEL" \
   --api-key "$API_KEY" \
   --max-model-len "$MAX_LEN" \
   --max-num-seqs "$MAX_SEQS" \
+  --max-num-batched-tokens "$MAX_BATCHED" \
   --gpu-memory-utilization "$GPU_UTIL" \
   $PREFIX_FLAG \
   --served-model-name "$(basename "$MODEL")" \

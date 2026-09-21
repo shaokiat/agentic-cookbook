@@ -1,0 +1,236 @@
+[
+  {
+    "backend": "vllm",
+    "model": "hosted_vllm/Qwen3.5-4B-4bit",
+    "hardware": "M-series Mac 16GB",
+    "dtype": "4bit",
+    "max_model_len": 8192,
+    "concurrency": 1,
+    "kind": "sweep",
+    "requests": 1,
+    "errors": 0,
+    "ttft_ms": {
+      "p50": 262.73691694950685,
+      "p95": 262.73691694950685
+    },
+    "itl_ms": {
+      "p50": 35.97202132305673,
+      "p95": 35.97202132305673
+    },
+    "e2e_ms": {
+      "p50": 4831.183624977712,
+      "p95": 4831.183624977712
+    },
+    "output_tps_per_req": 27.799383054380577,
+    "aggregate_output_tps": 26.49312611000344,
+    "total_output_tokens": 128,
+    "wall_s": 4.831441916991025,
+    "synthetic": false,
+    "note": "peak kv_cache_usage_perc=0.0930233 num_requests_running=1 num_requests_waiting=0",
+    "server": {
+      "max_model_len": 8192,
+      "block_size": "528",
+      "gpu_memory_utilization": "0.92",
+      "enable_prefix_caching": "True",
+      "kv_cache_size_tokens": "16384",
+      "num_gpu_blocks": "44",
+      "kv_cache_max_concurrency": "2.0",
+      "cache_dtype": "auto"
+    }
+  },
+  {
+    "backend": "vllm",
+    "model": "hosted_vllm/Qwen3.5-4B-4bit",
+    "hardware": "M-series Mac 16GB",
+    "dtype": "4bit",
+    "max_model_len": 8192,
+    "concurrency": 2,
+    "kind": "sweep",
+    "requests": 2,
+    "errors": 0,
+    "ttft_ms": {
+      "p50": 426.96445900946856,
+      "p95": 447.35683395992965
+    },
+    "itl_ms": {
+      "p50": 73.99507874016115,
+      "p95": 74.22252952746358
+    },
+    "e2e_ms": {
+      "p50": 9844.731833960395,
+      "p95": 9853.225708997343
+    },
+    "output_tps_per_req": 13.493705189402295,
+    "aggregate_output_tps": 25.970283544485365,
+    "total_output_tokens": 256,
+    "wall_s": 9.857420291984454,
+    "synthetic": false,
+    "note": "peak kv_cache_usage_perc=0.186047 num_requests_running=2 num_requests_waiting=0",
+    "server": {
+      "max_model_len": 8192,
+      "block_size": "528",
+      "gpu_memory_utilization": "0.92",
+      "enable_prefix_caching": "True",
+      "kv_cache_size_tokens": "16384",
+      "num_gpu_blocks": "44",
+      "kv_cache_max_concurrency": "2.0",
+      "cache_dtype": "auto"
+    }
+  },
+  {
+    "backend": "vllm",
+    "model": "hosted_vllm/Qwen3.5-4B-4bit",
+    "hardware": "M-series Mac 16GB",
+    "dtype": "4bit",
+    "max_model_len": 8192,
+    "concurrency": 4,
+    "kind": "sweep",
+    "requests": 4,
+    "errors": 0,
+    "ttft_ms": {
+      "p50": 1257.5548749882728,
+      "p95": 1266.779666999355
+    },
+    "itl_ms": {
+      "p50": 110.13711614196929,
+      "p95": 110.85266207058834
+    },
+    "e2e_ms": {
+      "p50": 15254.193417029455,
+      "p95": 15261.470249970444
+    },
+    "output_tps_per_req": 9.066109360563683,
+    "aggregate_output_tps": 33.53815938176345,
+    "total_output_tokens": 512,
+    "wall_s": 15.266192582959775,
+    "synthetic": false,
+    "note": "peak kv_cache_usage_perc=0.372093 num_requests_running=4 num_requests_waiting=0",
+    "server": {
+      "max_model_len": 8192,
+      "block_size": "528",
+      "gpu_memory_utilization": "0.92",
+      "enable_prefix_caching": "True",
+      "kv_cache_size_tokens": "16384",
+      "num_gpu_blocks": "44",
+      "kv_cache_max_concurrency": "2.0",
+      "cache_dtype": "auto"
+    }
+  },
+  {
+    "backend": "vllm",
+    "model": "hosted_vllm/Qwen3.5-4B-4bit",
+    "hardware": "M-series Mac 16GB",
+    "dtype": "4bit",
+    "max_model_len": 8192,
+    "concurrency": 8,
+    "kind": "sweep",
+    "requests": 8,
+    "errors": 0,
+    "ttft_ms": {
+      "p50": 1869.141666975338,
+      "p95": 1873.2800419675186
+    },
+    "itl_ms": {
+      "p50": 236.89758300773917,
+      "p95": 238.37755807110761
+    },
+    "e2e_ms": {
+      "p50": 31954.21733398689,
+      "p95": 31962.97112503089
+    },
+    "output_tps_per_req": 4.218305166275756,
+    "aggregate_output_tps": 32.02953740620085,
+    "total_output_tokens": 1024,
+    "wall_s": 31.970489832980093,
+    "synthetic": false,
+    "note": "peak kv_cache_usage_perc=0.744186 num_requests_running=8 num_requests_waiting=0",
+    "server": {
+      "max_model_len": 8192,
+      "block_size": "528",
+      "gpu_memory_utilization": "0.92",
+      "enable_prefix_caching": "True",
+      "kv_cache_size_tokens": "16384",
+      "num_gpu_blocks": "44",
+      "kv_cache_max_concurrency": "2.0",
+      "cache_dtype": "auto"
+    }
+  },
+  {
+    "backend": "vllm",
+    "model": "hosted_vllm/Qwen3.5-4B-4bit",
+    "hardware": "M-series Mac 16GB",
+    "dtype": "4bit",
+    "max_model_len": 8192,
+    "concurrency": 16,
+    "kind": "sweep",
+    "requests": 16,
+    "errors": 0,
+    "ttft_ms": {
+      "p50": 3008.0072080018,
+      "p95": 36906.44595801132
+    },
+    "itl_ms": {
+      "p50": 257.98870407055887,
+      "p95": 258.14841371662106
+    },
+    "e2e_ms": {
+      "p50": 35792.504791985266,
+      "p95": 56733.72108396143
+    },
+    "output_tps_per_req": 4.821603108535798,
+    "aggregate_output_tps": 36.09441967951036,
+    "total_output_tokens": 2048,
+    "wall_s": 56.740072791988496,
+    "synthetic": false,
+    "note": "peak kv_cache_usage_perc=0.930233 num_requests_running=10 num_requests_waiting=0",
+    "server": {
+      "max_model_len": 8192,
+      "block_size": "528",
+      "gpu_memory_utilization": "0.92",
+      "enable_prefix_caching": "True",
+      "kv_cache_size_tokens": "16384",
+      "num_gpu_blocks": "44",
+      "kv_cache_max_concurrency": "2.0",
+      "cache_dtype": "auto"
+    }
+  },
+  {
+    "backend": "vllm",
+    "model": "hosted_vllm/Qwen3.5-4B-4bit",
+    "hardware": "M-series Mac 16GB",
+    "dtype": "4bit",
+    "max_model_len": 8192,
+    "concurrency": 32,
+    "kind": "sweep",
+    "requests": 32,
+    "errors": 0,
+    "ttft_ms": {
+      "p50": 31950.541709025856,
+      "p95": 62022.48662500642
+    },
+    "itl_ms": {
+      "p50": 224.77148885024698,
+      "p95": 227.1785852989717
+    },
+    "e2e_ms": {
+      "p50": 60369.089415995404,
+      "p95": 90876.53141602641
+    },
+    "output_tps_per_req": 4.925773833934434,
+    "aggregate_output_tps": 40.33759431493477,
+    "total_output_tokens": 4096,
+    "wall_s": 101.54299158300273,
+    "synthetic": false,
+    "note": "peak kv_cache_usage_perc=0.930233 num_requests_running=10 num_requests_waiting=0",
+    "server": {
+      "max_model_len": 8192,
+      "block_size": "528",
+      "gpu_memory_utilization": "0.92",
+      "enable_prefix_caching": "True",
+      "kv_cache_size_tokens": "16384",
+      "num_gpu_blocks": "44",
+      "kv_cache_max_concurrency": "2.0",
+      "cache_dtype": "auto"
+    }
+  }
+]

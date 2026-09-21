@@ -3,7 +3,7 @@
 # Read by the Makefile, by deploy/vllm/local/serve.sh, and by the benchmark harness, all
 # through deploy/engines.py. Override any value for one run without editing the file:
 #
-#   make serve-vllm VLLM_MODEL=mlx-community/Qwen3-4B-4bit
+#   make serve-vllm VLLM_MODEL=mlx-community/Qwen3.5-4B-8bit
 
 # All engines serve here, one at a time. LOCAL_API_BASE in .env must match.
 local:
@@ -11,15 +11,29 @@ local:
   api_key: cookbook-local
 
 vllm:
-  # 0.6B on purpose: small enough to leave headroom for 64 concurrent requests on a 16GB
-  # laptop, which is what makes the scheduler behaviour visible.
-  model: mlx-community/Qwen3-0.6B-4bit
+  # ~2.3GB of weights at 4-bit, so a 16GB laptop still has room for a real KV cache and a
+  # deep batch. Drop to mlx-community/Qwen3.5-2B-4bit if you are memory-starved, or raise
+  # the quant (-6bit, -8bit, -bf16) to trade memory for quality.
+  model: mlx-community/Qwen3.5-4B-4bit
+
+  # Context budget per sequence. This is the KV cache multiplier: the cache has to hold
+  # max_model_len tokens x max_num_seqs sequences, so halving this doubles how deep you
+  # can batch. Lower it first when vLLM refuses to start for lack of KV cache blocks.
   max_model_len: 8192
 
   # The batching knob. Caps how many sequences the scheduler runs at once — set it at or
   # above your top sweep level, or the curve flattens at this number rather than at the
   # hardware limit, which is measuring the config and not the engine.
-  max_num_seqs: 64
+  # 32 rather than 64 at 4B: 64 x 8192 tokens of KV does not fit alongside the weights.
+  max_num_seqs: 32
+
+  # The OTHER half of continuous batching: a token budget per scheduler step, where
+  # max_num_seqs is a sequence budget. Every step the scheduler fills up to this many
+  # tokens from the waiting prefills and the running decodes combined, so a prompt longer
+  # than this is split across steps (chunked prefill). Bigger = prefill finishes in fewer
+  # steps (better throughput), but one big prefill chunk delays every decode sharing the
+  # step (worse ITL for everyone already streaming). vllm-metal defaults to 2048.
+  max_num_batched_tokens: 2048
 
   # Share of memory for weights + KV cache. Higher means a bigger cache and more room to
   # batch; too high and the OS starts swapping, which the sweep will read as a knee.
@@ -33,11 +47,13 @@ vllm:
 
 # The control: it serves one request at a time and has no batching knobs to set. That is
 # the point of it, so there is nothing here but the model.
+# Must stay the SAME weights and quant as vllm.model, or the comparison measures the model
+# instead of the scheduler.
 mlx:
-  model: mlx-community/Qwen3-0.6B-4bit
+  model: mlx-community/Qwen3.5-4B-4bit
 
 ollama:
-  model: qwen3:0.6b
+  model: qwen3.5:4b
 
   # The whole ballgame, and it must be set BEFORE the server starts. At Ollama's
   # conservative default it queues past a handful of concurrent requests and the

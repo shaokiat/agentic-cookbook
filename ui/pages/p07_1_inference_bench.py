@@ -23,8 +23,8 @@ ENGINES = [
         """make serve-vllm      # vllm-metal on Apple Silicon (MLX backend, own venv)
 
 # the flags it passes, all set in deploy/engines.yaml
-vllm serve mlx-community/Qwen3-0.6B-4bit --port 8000 \\
-  --max-model-len 8192 --max-num-seqs 64 \\
+vllm serve mlx-community/Qwen3.5-4B-4bit --port 8000 \\
+  --max-model-len 8192 --max-num-seqs 32 --max-num-batched-tokens 2048 \\
   --gpu-memory-utilization 0.92 --enable-prefix-caching""",
         [
             "**Continuous batching** — finished sequences leave the batch at every decode "
@@ -75,7 +75,7 @@ OLLAMA_HOST=127.0.0.1:8000 OLLAMA_NUM_PARALLEL=32 \\
 make serve-mlx
 
 # under the hood
-~/.venv-mlx-lm/bin/mlx_lm.server --model mlx-community/Qwen3-0.6B-4bit --port 8000""",
+~/.venv-mlx-lm/bin/mlx_lm.server --model mlx-community/Qwen3.5-4B-4bit --port 8000""",
         [
             "**Not a contender — a control.** It serves the *same* MLX weights at the *same* "
             "quantization on the *same* Metal backend as vllm-metal. Quantization and hardware "

@@ -21,7 +21,7 @@ never code:
 # .env
 HOSTED_VLLM_API_BASE=http://localhost:8000/v1
 HOSTED_VLLM_API_KEY=cookbook-local
-VLLM_MODEL=Qwen3-0.6B-4bit
+VLLM_MODEL=Qwen3.5-4B-4bit
 
 # The benchmarks in examples/07_inference use one endpoint instead, and detect the engine:
 LOCAL_API_BASE=http://localhost:8000/v1
@@ -61,12 +61,62 @@ It serves MLX-format models from `mlx-community` on Hugging Face, not the fp16 s
 you would use on an NVIDIA box. Model coverage is still growing; check the
 [compatibility matrix](https://docs.vllm.ai/projects/vllm-metal/) before picking one.
 
-**Sizing:** start small. `serve.sh` defaults to `mlx-community/Qwen3-0.6B-4bit` because the
-point is to observe scheduling, and a 0.6B model leaves room for 64 concurrent requests on a
-16GB laptop. Unified memory is shared with the OS, so a 7–8B model at 4-bit needs ~32GB to
-batch meaningfully — going bigger starves the batch and destroys the very behaviour you are
-trying to see. Full setup for all three engines:
+**Sizing:** `serve.sh` defaults to `mlx-community/Qwen3.5-4B-4bit` — ~2.3GB of weights,
+which on a 16GB laptop leaves enough unified memory for a real KV cache and a batch deep
+enough to see the scheduler work. Unified memory is shared with the OS, so a 7–8B model at
+4-bit needs ~32GB to batch meaningfully; going bigger starves the batch and destroys the
+very behaviour you are trying to see. Full setup for all three engines:
 [`examples/07_inference/00_running_engines.md`](../../examples/07_inference/00_running_engines.md).
+
+---
+
+## The args, and what each one actually does
+
+Every value below lives in [`deploy/engines.yaml`](../engines.yaml) and is overridable for a
+single run, because `engines.py --sh` renders them as `: "${KEY:=value}"` — an existing
+environment variable always wins:
+
+```bash
+make serve-vllm VLLM_MAX_NUM_SEQS=8          # one run, file untouched
+```
+
+The three that matter fight over the same pool of unified memory. vLLM loads the weights
+first, then gives whatever is left of `gpu_memory_utilization` to the KV cache, and the cache
+has to hold `max_model_len x max_num_seqs` tokens for a full batch. Push any one up and the
+other two have less to work with.
+
+| Arg (`VLLM_*` env) | Default | What it controls | What you see when you change it |
+| :--- | :--- | :--- | :--- |
+| `MODEL` | `mlx-community/Qwen3.5-4B-4bit` | Weights and quantization | `-8bit`/`-bf16` roughly double/quadruple the weight footprint, stealing it from the KV cache. Quality up, batch depth down. |
+| `MAX_MODEL_LEN` | `8192` | Context budget per sequence | The KV cache multiplier. Halving it roughly doubles how many sequences fit. Lower this first if vLLM refuses to start for lack of cache blocks. |
+| `MAX_NUM_SEQS` | `32` | Sequences the scheduler runs in one batch | The batching knob. Set it *below* your sweep's top concurrency and the throughput curve flattens at exactly this number — you measured the config, not the engine. |
+| `GPU_MEMORY_UTILIZATION` | `0.92` | Share of memory for weights + cache | Higher = bigger cache = deeper batches, until the OS starts swapping and the sweep reads that as a hardware knee. On a Mac the OS needs its share; above ~0.95 gets unstable. |
+| `ENABLE_PREFIX_CACHING` | `1` | Reuse of a shared prompt prefix | Set `0` and re-run the sweep. The gap is what prefix caching is worth for *your* prompts — large with a long shared system prompt, near zero with unique prompts. |
+| `MAX_NUM_BATCHED_TOKENS` | `2048` | Tokens per scheduler step | The *other* batching budget: `MAX_NUM_SEQS` caps sequences, this caps work per forward pass. Raise it and long prefills finish in fewer steps; lower it and streaming stays smoother. |
+| `EXTRA_ARGS` | `""` | Anything else, word-split verbatim | The escape hatch: `VLLM_EXTRA_ARGS="--swap-space 2"`. |
+
+### A sane way to experiment
+
+Change **one** arg, re-run the sweep, compare. Two at a time and you cannot attribute the
+difference:
+
+```bash
+make serve-vllm                                   # terminal 1
+make bench ENGINE=vllm                            # terminal 2 -> results/
+
+make stop && make serve-vllm VLLM_MAX_NUM_SEQS=4  # the batching cap, made visible
+make bench ENGINE=vllm
+```
+
+Startup logs are the ground truth for whether an arg took effect — vLLM prints the number of
+KV cache blocks and tokens it actually allocated, which is the real budget your `max_num_seqs`
+is spending. If that number collapses after a change, that is your answer.
+
+**Measured results for each of these args on Qwen3.5-4B are in
+[`arg_sweeps.md`](arg_sweeps.md)** — one arg changed at a time, with the sweep numbers.
+
+> The older numbers in [`examples/07_inference/`](../../examples/07_inference/) were taken
+> with a 0.6B model. The shape holds, the absolute figures do not.
 
 ### mlx-lm, the control
 

@@ -16,7 +16,7 @@
 # Models and tuning parameters live in deploy/engines.yaml, shared with serve.sh. Make
 # cannot read YAML, so engines.py renders it to a KEY=VALUE file make can include -
 # regenerated whenever the YAML changes. Command-line overrides still win:
-#   make serve-vllm VLLM_MODEL=mlx-community/Qwen3-4B-4bit
+#   make serve-vllm VLLM_MODEL=mlx-community/Qwen3.5-4B-8bit
 ENGINES_YAML ?= deploy/engines.yaml
 ENGINES_MK := .engines.mk
 
@@ -28,9 +28,9 @@ $(ENGINES_MK): $(ENGINES_YAML) deploy/engines.py
 # Fallbacks if the YAML is missing or predates a setting.
 LOCAL_PORT ?= 8000
 LOCAL_API_KEY ?= cookbook-local
-VLLM_MODEL ?= mlx-community/Qwen3-0.6B-4bit
-MLX_MODEL ?= mlx-community/Qwen3-0.6B-4bit
-OLLAMA_MODEL ?= qwen3:0.6b
+VLLM_MODEL ?= mlx-community/Qwen3.5-4B-4bit
+MLX_MODEL ?= mlx-community/Qwen3.5-4B-4bit
+OLLAMA_MODEL ?= qwen3.5:4b
 OLLAMA_NUM_PARALLEL ?= 32
 OLLAMA_CONTEXT_LENGTH ?= 8192
 
