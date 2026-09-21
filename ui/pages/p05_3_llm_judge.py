@@ -3,14 +3,38 @@ import streamlit as st
 
 from core.model import ModelProvider
 
-from common import cost_metric, load_example, page_tabs, selected_model
+from common import about_from, cost_metric, load_example, page_tabs, selected_model
 
 st.title("LLM Judge")
 st.caption("A judge model scores agent responses against a rubric — the judge prompt is the eval.")
 
+CORE_CONCEPT = """\
+**What it is**
+
+A second model call — the judge — scores a first agent's response, in one of three modes:
+single-criterion rating (1-5 plus a justification), multi-criterion rubric (structured JSON per
+criterion), or pairwise A/B comparison between two responses to the same question.
+
+```mermaid
+flowchart LR
+    Q[Question] --> A["Agent under test produces a response"]
+    A --> J["Judge model scores it against a rubric prompt"]
+    J --> S["Structured score — rating, JSON per criterion, or A/B verdict"]
+```
+
+**Key insight**
+
+The judge prompt **is** the eval — it deserves the same version control and scrutiny as code,
+because changing its wording changes what "good" means for every response it scores. Structured
+JSON output (rather than free-form prose) is what makes results machine-readable, so evals can
+run unattended in CI across hundreds of cases instead of relying on someone eyeballing outputs
+one at a time.
+"""
+
+
 relpath = "examples/05_evaluation_and_monitoring/03_llm_judge.py"
 mod = load_example(relpath)
-tab_demo = page_tabs(relpath, mod)
+tab_demo = page_tabs(relpath, mod, about_extra=about_from(CORE_CONCEPT))
 
 with tab_demo:
     mode = st.radio("Mode", ["Single criterion", "Multi-criterion rubric", "Pairwise A/B"], horizontal=True)

@@ -6,7 +6,7 @@ import streamlit as st
 
 from core.model import ModelProvider
 
-from common import cost_metric, live_panel, load_example, page_tabs, selected_model
+from common import about_from, cost_metric, live_panel, load_example, page_tabs, selected_model
 
 st.title("Parallel Subagents")
 st.caption(
@@ -14,9 +14,58 @@ st.caption(
     "future completes (worker threads never touch the UI)."
 )
 
+CORE_CONCEPT = """\
+**What it is**
+
+Several independent worker agents run concurrently instead of one after another, then a fourth
+aggregator agent synthesizes their results into one summary. Unlike the orchestrator pattern —
+where delegation happens through the model's own tool-call loop, one call at a time — fan-out
+here is plain Python: all workers are submitted to a thread pool at once, and results are
+collected as they complete.
+
+```mermaid
+flowchart TD
+    Tasks[Independent tasks] --> P["ThreadPoolExecutor — one thread per task"]
+    P --> W1[Worker 1]
+    P --> W2[Worker 2]
+    P --> W3[Worker 3]
+    W1 --> AC[as_completed — arrival order, not spawn order]
+    W2 --> AC
+    W3 --> AC
+    AC --> Agg["Aggregator agent — no tools, synthesizes all results"]
+    Agg --> F[Unified summary]
+```
+
+**Why threads, not `asyncio`**
+
+`Agent.run()` calls a synchronous, blocking model client under the hood. Wrapping a blocking
+call in `async def` doesn't make it non-blocking — it just hides the problem, and coroutines
+that never hit a real `await` still run one at a time. `ThreadPoolExecutor` sidesteps this
+entirely: each worker blocks independently on its own network call, on its own OS thread, and
+Python releases the GIL during I/O so the threads genuinely overlap. The rule of thumb is to
+match the concurrency primitive to the call stack — async code reaches for `asyncio.gather`,
+synchronous blocking code reaches for `ThreadPoolExecutor`.
+
+**Why the speedup approaches the worker count**
+
+Each worker spends nearly all its time waiting on the model API, not on CPU work — so wall-clock
+time for the parallel run is bounded by the *slowest* individual worker, not the sum of all of
+them. Three workers that would take ~8s sequentially finish in ~2s together, because their wait
+times overlap almost completely.
+
+**Isolation and aggregation stay separate concerns**
+
+Like the orchestrator pattern, every worker gets an empty `Memory()` — none can see another's
+output, so each produces an uncontaminated, independent answer. But here coordination (the
+fan-out itself) lives in ordinary Python code, while synthesis is delegated to a dedicated
+aggregator agent — splitting "who runs what" from "what does it mean," rather than one agent
+doing both jobs.
+"""
+
+
 relpath = "examples/03_multi_agent_systems/02_parallel_subagents.py"
 mod = load_example(relpath)
-tab_demo = page_tabs(relpath, mod)
+tab_demo = page_tabs(relpath, mod, about_extra=about_from(CORE_CONCEPT))
 
 tasks = mod.DEFAULT_TASKS
 
