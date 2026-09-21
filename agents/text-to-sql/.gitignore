@@ -1,0 +1,28 @@
+# Credentials
+.env
+.env.*
+!.env.example
+
+# Runtime data
+query_log.jsonl
+eval_runs.json
+answers.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Testing
+.pytest_cache/
+
+# IDE / tools
+.DS_Store

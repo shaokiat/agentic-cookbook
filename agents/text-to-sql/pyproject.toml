@@ -1,0 +1,25 @@
+[project]
+name = "text-to-sql"
+version = "0.1.0"
+description = "Text-to-SQL agent: schema-grounded prompting, a read-only guard, and one bounded repair"
+requires-python = ">=3.11"
+dependencies = [
+    "openai>=1.40.0",
+    "python-dotenv>=1.0.1",
+    "sqlalchemy>=2.0.0",
+    "psycopg2-binary>=2.9.13",
+    "pymysql>=1.2.3",
+]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[project.scripts]
+text-to-sql = "text_to_sql.cli:main"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["text_to_sql*"]
