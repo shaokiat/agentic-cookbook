@@ -76,3 +76,4 @@ HOSTED_VLLM_API_BASE=http://localhost:8000/v1   # for the sidebar model picker
 Beyond the concept-ladder examples, `agents/` hosts standalone agents built on these patterns — each a self-contained project with its own dependencies and virtualenv:
 - [`agents/theta-agent/`](agents/theta-agent/) — LangGraph multi-strategy options screener (conditional routing, human-in-the-loop `interrupt()`, Chainlit UI).
 - [`agents/mini-researcher/`](agents/mini-researcher/) — simplified [gpt-researcher](https://github.com/assafelovic/gpt-researcher) port: plan → parallel search/scrape/compress → synthesize, composing Plan-and-Execute, multi-agent fan-out, and context compression into one pipeline.
+- [`agents/text-to-sql/`](agents/text-to-sql/) — natural-language-to-SQL CLI over any SQLite/Postgres/MySQL database: schema-grounded prompt ablation (baseline → schema → docs → hints), a read-only guard as the real safety boundary, and one bounded repair-on-failure turn.
