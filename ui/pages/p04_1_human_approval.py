@@ -1,6 +1,35 @@
 import streamlit as st
 
-from common import cost_metric, load_example, page_tabs, selected_model, tool_list_expander
+from common import about_from, cost_metric, load_example, page_tabs, selected_model, tool_list_expander
+
+CORE_CONCEPT = """\
+**What it is**
+
+Tools marked `@dangerous` don't execute immediately. The agent's loop pauses mid-step, yields
+an `approval_request` event, and waits — resuming only once the surrounding UI answers with a
+plain `bool`. A terminal run asks with a y/n prompt; this Streamlit page holds the paused
+generator in session state and resumes it from Allow/Deny buttons.
+
+```mermaid
+flowchart TD
+    T[Model requests a dangerous tool] --> R["Loop yields approval_request, pauses"]
+    R --> H{Human decides}
+    H -->|Allow| Run[Tool executes normally] --> O[Result added as observation]
+    H -->|Deny| D["Denial string added as observation"]
+    O --> M[Model continues reasoning]
+    D --> M
+```
+
+**Key insight**
+
+Approval is **loop policy, not tool internals**. The tool functions themselves stay pure and
+unaware that anything is being gated — the pause lives entirely in the tool-execution step of
+the agent loop, so any frontend gets to decide how it wants to ask (a terminal prompt, buttons
+on a page, a Slack approval). And crucially, a denial still arrives as an ordinary `tool`
+observation, not an exception — the model's view of "how do I find things out" never changes,
+it just sometimes gets told no.
+"""
+
 
 relpath = "examples/04_tool_use_patterns/01_human_approval.py"
 mod = load_example(relpath)
@@ -22,7 +51,7 @@ st.caption(
     "Dangerous tools pause the loop with an approval_request event. "
     "The generator is held in session state; Allow/Deny resumes it via generator.send()."
 )
-tab_demo = page_tabs(relpath, mod)
+tab_demo = page_tabs(relpath, mod, about_extra=about_from(CORE_CONCEPT))
 
 
 def pump(sent=None):

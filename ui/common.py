@@ -35,6 +35,7 @@ BLOG_ANCHORS = {
 }
 
 MODELS = [
+    "fireworks_ai/accounts/fireworks/models/deepseek-v4p1-flash",
     "anthropic/claude-haiku-4-5",
     "anthropic/claude-sonnet-4-5",
     "openai/gpt-4o",
@@ -49,7 +50,7 @@ if os.getenv("HOSTED_VLLM_API_BASE"):
 if os.getenv("OLLAMA_API_BASE"):
     MODELS.append(f"ollama_chat/{os.getenv('OLLAMA_MODEL', 'qwen3:8b')}")
 
-DEFAULT_MODEL = "anthropic/claude-haiku-4-5"
+DEFAULT_MODEL = "fireworks_ai/accounts/fireworks/models/deepseek-v4p1-flash"
 
 
 def load_example(relpath: str):
@@ -76,6 +77,21 @@ def live_panel(label: str):
         body_slot = st.empty()
     label_slot.markdown(f"**{label}**")
     return label_slot, body_slot
+
+
+def render_markdown_with_mermaid(text: str) -> None:
+    """st.markdown doesn't render ```mermaid fences itself; split them out to st.mermaid_chart."""
+    parts = text.split("```mermaid")
+    st.markdown(parts[0])
+    for part in parts[1:]:
+        diagram, _, rest = part.partition("```")
+        st.mermaid_chart(diagram.strip())
+        st.markdown(rest)
+
+
+def about_from(text: str):
+    """Wraps a CORE_CONCEPT markdown string as an about_extra callable for page_tabs/chat_page/single_run_page."""
+    return lambda: render_markdown_with_mermaid(text)
 
 
 def _about_content(relpath: str | None, mod=None, *, walkthrough_path: str | None = None,
@@ -155,7 +171,10 @@ def page_tabs(relpath: str | None, mod=None, *, walkthrough_path: str | None = N
 
 def model_picker() -> str:
     """Global sidebar model selector; defaults to DEFAULT_MODEL."""
-    return st.sidebar.selectbox("Model", MODELS, index=MODELS.index(DEFAULT_MODEL), key="model_choice")
+    return st.sidebar.selectbox(
+        "Model", MODELS, index=MODELS.index(DEFAULT_MODEL), key="model_choice",
+        format_func=lambda m: m.rsplit("/", 1)[-1],
+    )
 
 
 def selected_model() -> str:
@@ -212,7 +231,8 @@ def render_events(gen) -> str:
     return final
 
 
-def chat_page(title: str, caption: str, relpath: str, builder: str = "build_agent", **build_kwargs):
+def chat_page(title: str, caption: str, relpath: str, builder: str = "build_agent",
+              about_extra=None, **build_kwargs):
     """Multi-turn chat page: one persistent agent per session, chat input drives run_events."""
     mod = load_example(relpath)
     model = selected_model()
@@ -226,7 +246,7 @@ def chat_page(title: str, caption: str, relpath: str, builder: str = "build_agen
         if st.button("Reset conversation", key=f"reset::{relpath}"):
             st.session_state.pop(state_key, None)
     st.caption(caption)
-    tab_demo = page_tabs(relpath, mod)
+    tab_demo = page_tabs(relpath, mod, about_extra=about_extra)
 
     if state_key not in st.session_state:
         st.session_state[state_key] = {
@@ -252,13 +272,13 @@ def chat_page(title: str, caption: str, relpath: str, builder: str = "build_agen
 
 
 def single_run_page(title: str, caption: str, relpath: str, builder: str = "build_agent",
-                    default_prompt_attr: str = "DEFAULT_PROMPT", **build_kwargs):
+                    default_prompt_attr: str = "DEFAULT_PROMPT", about_extra=None, **build_kwargs):
     """One-shot demo page: prefilled prompt, Run button, events streamed inline."""
     st.title(title)
     st.caption(caption)
 
     mod = load_example(relpath)
-    tab_demo = page_tabs(relpath, mod)
+    tab_demo = page_tabs(relpath, mod, about_extra=about_extra)
 
     with tab_demo:
         agent = getattr(mod, builder)(model=selected_model(), **build_kwargs)
